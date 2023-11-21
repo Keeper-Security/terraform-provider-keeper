@@ -7,9 +7,12 @@ import (
 
 func mergeMaps[K comparable, V any](maps ...map[K]V) (m map[K]V) {
 	m = make(map[K]V)
+	var ok bool
 	for _, mm := range maps {
 		for k, v := range mm {
-			m[k] = v
+			if _, ok = m[k]; !ok {
+				m[k] = v
+			}
 		}
 	}
 	return

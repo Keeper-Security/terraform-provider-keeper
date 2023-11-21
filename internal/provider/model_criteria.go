@@ -6,11 +6,80 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
 	"path"
 	"reflect"
 	"strconv"
 	"strings"
 )
+
+type nodeCriteria struct {
+	NodeId  types.Int64 `tfsdk:"node_id"`
+	Cascade types.Bool  `tfsdk:"cascade"`
+}
+
+var nodeCriteriaAttributes = map[string]schema.Attribute{
+	"node_id": schema.Int64Attribute{
+		Required:    true,
+		Description: "Base Node ID",
+	},
+	"cascade": schema.BoolAttribute{
+		Optional:    true,
+		Description: "Include subnodes",
+	},
+}
+
+type nodeMatcher = func(int64) bool
+
+func getNodeMatcher(nc *nodeCriteria, nodes enterprise.IEnterpriseEntity[enterprise.INode, int64]) (mf nodeMatcher, diags diag.Diagnostics) {
+	if nc != nil {
+		var rootNodeId = nc.NodeId.ValueInt64()
+		var n = nodes.GetEntity(rootNodeId)
+		if n == nil {
+			diags.AddError("Create a node matcher error.",
+				fmt.Sprintf("Node ID \"%d\" not found", rootNodeId))
+			return
+		}
+		var subNodes []int64
+		var subnodeLookup = make(map[int64][]int64)
+		nodes.GetAllEntities(func(node enterprise.INode) bool {
+			subNodes = subnodeLookup[node.ParentId()]
+			subNodes = append(subNodes, node.NodeId())
+			subnodeLookup[node.ParentId()] = subNodes
+			return true
+		})
+
+		if nc.Cascade.ValueBool() {
+			var added = make(map[int64]bool)
+			var nodeIds = append(([]int64)(nil), rootNodeId)
+			added[rootNodeId] = true
+			var pos = 0
+			var ok bool
+			for pos < len(nodeIds) {
+				var nodeId = nodeIds[pos]
+				pos++
+				if subNodes, ok = subnodeLookup[nodeId]; ok {
+					for _, nodeId = range subNodes {
+						if _, ok = added[nodeId]; !ok {
+							nodeIds = append(nodeIds, nodeId)
+							added[nodeId] = true
+						}
+					}
+				}
+			}
+			mf = func(nodeId int64) (ok bool) {
+				_, ok = added[nodeId]
+				return
+			}
+		} else {
+			mf = func(nodeId int64) (ok bool) {
+				ok = nodeId == rootNodeId
+				return
+			}
+		}
+	}
+	return
+}
 
 type filterCriteria struct {
 	Field types.String `tfsdk:"field"`
@@ -304,6 +373,9 @@ const (
 )
 
 func getFieldMatcher(fc *filterCriteria, modelType reflect.Type) (cb matcher, diags diag.Diagnostics) {
+	if fc == nil {
+		return
+	}
 	if modelType.Kind() == reflect.Pointer {
 		modelType = modelType.Elem()
 	}

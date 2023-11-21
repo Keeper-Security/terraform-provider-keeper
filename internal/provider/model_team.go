@@ -3,7 +3,6 @@ package provider
 import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/api"
 	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
 )
 
@@ -16,25 +15,25 @@ type teamModel struct {
 	RestrictView  types.Bool   `tfsdk:"restrict_view"`
 }
 
-func (model *teamModel) toKeeper(keeper *enterprise.Team) {
-	keeper.Name = model.Name.ValueString()
+func (model *teamModel) toKeeper(keeper enterprise.ITeamEdit) {
+	keeper.SetName(model.Name.ValueString())
 	if model.NodeId.IsNull() {
-		keeper.NodeId = 0
+		keeper.SetNodeId(0)
 	} else {
-		keeper.NodeId = model.NodeId.ValueInt64()
+		keeper.SetNodeId(model.NodeId.ValueInt64())
 	}
-	keeper.RestrictEdit = !model.RestrictEdit.IsNull() && model.RestrictEdit.ValueBool()
-	keeper.RestrictShare = !model.RestrictShare.IsNull() && model.RestrictShare.ValueBool()
-	keeper.RestrictView = !model.RestrictView.IsNull() && model.RestrictView.ValueBool()
+	keeper.SetRestrictEdit(!model.RestrictEdit.IsNull() && model.RestrictEdit.ValueBool())
+	keeper.SetRestrictShare(!model.RestrictShare.IsNull() && model.RestrictShare.ValueBool())
+	keeper.SetRestrictView(!model.RestrictView.IsNull() && model.RestrictView.ValueBool())
 }
 
-func (model *teamModel) fromKeeper(keeper *enterprise.Team) {
-	model.TeamUid = types.StringValue(api.Base64UrlEncode(keeper.TeamUid))
-	model.Name = types.StringValue(keeper.Name)
-	model.NodeId = types.Int64Value(keeper.NodeId)
-	model.RestrictEdit = types.BoolValue(keeper.RestrictEdit)
-	model.RestrictShare = types.BoolValue(keeper.RestrictShare)
-	model.RestrictView = types.BoolValue(keeper.RestrictView)
+func (model *teamModel) fromKeeper(keeper enterprise.ITeam) {
+	model.TeamUid = types.StringValue(keeper.TeamUid())
+	model.Name = types.StringValue(keeper.Name())
+	model.NodeId = types.Int64Value(keeper.NodeId())
+	model.RestrictEdit = types.BoolValue(keeper.RestrictEdit())
+	model.RestrictShare = types.BoolValue(keeper.RestrictShare())
+	model.RestrictView = types.BoolValue(keeper.RestrictView())
 }
 
 var teamSchemaAttributes = map[string]schema.Attribute{
@@ -61,5 +60,26 @@ var teamSchemaAttributes = map[string]schema.Attribute{
 	"restrict_view": schema.BoolAttribute{
 		Computed:    true,
 		Description: "Restrict View flag",
+	},
+}
+
+type teamShortModel struct {
+	TeamUid types.String `tfsdk:"team_uid"`
+	Name    types.String `tfsdk:"name"`
+}
+
+func (model *teamShortModel) fromKeeper(keeper enterprise.ITeam) {
+	model.TeamUid = types.StringValue(keeper.TeamUid())
+	model.Name = types.StringValue(keeper.Name())
+}
+
+var teamShortSchemaAttributes = map[string]schema.Attribute{
+	"team_uid": schema.StringAttribute{
+		Computed:    true,
+		Description: "Team UID",
+	},
+	"name": schema.StringAttribute{
+		Computed:    true,
+		Description: "Team Name",
 	},
 }
