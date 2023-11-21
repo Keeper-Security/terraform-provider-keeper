@@ -9,6 +9,13 @@ terraform {
 provider "kepr" {
    // config_type = "commander"
 }
+
+
+
+
+
+
+
 /*
 resource "keeper-enterprise_team" "Team1" {
   name=
@@ -69,17 +76,18 @@ data "keeper-enterprise_teams" "teams" {  // -> IDs
   names = [a,b,c,d]
 }
 
-data "kepr_nodes" "azure" {
-  subnodes = {
-    node_id = 820338837337
-    cascade = true
-    include_parent = true
-  }
-}
 */
+#data "kepr_nodes" "azure" {
+#  subnodes = {
+#    node_id = 820338837337
+#    cascade = true
+#    include_parent = true
+#  }
+#}
 
 #data "kepr_node" "root" {
-# is_root = true
+#  is_root = true
+#  //name = "nnd"
 #}
 
 #data "kepr_users" "active" {
@@ -91,14 +99,26 @@ data "kepr_nodes" "azure" {
 #    node_id = 820338837337
 #    restrict_share = true
 #}
-resource "kepr_team" "vault" {
+
+data "kepr_team" "vault" {
   name = "Vault"
+  include_users = true
 }
 
 #resource "kepr_team_users" "vault_users" {
 #  team_uid = resource.vault.team_uid
 #}
+#data "kepr_login_enforcements" "user_login" {
+#  minimum = 12
+#  upper = 2
+#}
+#
+#resource "kepr_role"  "aaa" {
+#  login_enforments = {
+#    minimum = 12
+#  }
+#}
 
  output "example" {
-   value = resource.kepr_team.vault.team_uid
+   value = data.kepr_team.vault
  }

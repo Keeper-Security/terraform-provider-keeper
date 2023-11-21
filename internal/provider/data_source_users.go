@@ -27,7 +27,7 @@ type usersDataSourceModel struct {
 }
 
 type usersDataSource struct {
-	users map[int64]*enterprise.User
+	users enterprise.IEnterpriseEntity[enterprise.IUser, int64]
 }
 
 func NewUsersDataSource() datasource.DataSource {
@@ -78,9 +78,9 @@ func (d *usersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 
 	var state = uq
 
-	var activeMatcher func(user *enterprise.User) bool
+	var activeMatcher func(user enterprise.IUser) bool
 	if uq.IsActive.IsNull() {
-		activeMatcher = func(_ *enterprise.User) bool {
+		activeMatcher = func(_ enterprise.IUser) bool {
 			return true
 		}
 	} else {
@@ -88,8 +88,8 @@ func (d *usersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		if uq.IsActive.ValueBool() {
 			activeFlag = "active"
 		}
-		activeMatcher = func(user *enterprise.User) bool {
-			return user.Status == activeFlag
+		activeMatcher = func(user enterprise.IUser) bool {
+			return user.Status() == activeFlag
 		}
 	}
 
@@ -153,19 +153,22 @@ func (d *usersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		}
 	}
 
-	for _, u := range d.users {
+	d.users.GetAllEntities(func(u enterprise.IUser) (resume bool) {
+		resume = true
 		if !activeMatcher(u) {
-			continue
+			return
 		}
 		var um = new(userModel)
 		um.fromKeeper(u)
 		if cb != nil {
 			if !cb(um) {
-				continue
+				return
 			}
 		}
 		state.Users = append(state.Users, um)
-	}
+
+		return
+	})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -174,8 +177,8 @@ func (d *usersDataSource) Configure(ctx context.Context, req datasource.Configur
 	if req.ProviderData == nil {
 		return
 	}
-	if loader, ok := req.ProviderData.(enterprise.IEnterpriseLoader); ok {
-		d.users = loader.EnterpriseData().Users().GetData()
+	if ed, ok := req.ProviderData.(enterprise.IEnterpriseData); ok {
+		d.users = ed.Users()
 	} else {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",

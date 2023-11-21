@@ -30,7 +30,7 @@ type nodesDataSourceModel struct {
 }
 
 type nodesDataSource struct {
-	nodes enterprise.IEnterpriseEntity[enterprise.Node]
+	nodes enterprise.IEnterpriseEntity[enterprise.INode, int64]
 }
 
 func NewNodesDataSource() datasource.DataSource {
@@ -87,7 +87,7 @@ func (d *nodesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	var state = nq
 
 	if nq.SubNodeCriteria != nil {
-		var nodes []*enterprise.Node
+		var nodes []enterprise.INode
 		var nodeId int64
 		if !nq.SubNodeCriteria.NodeId.IsNull() && !nq.SubNodeCriteria.NodeId.IsUnknown() {
 			nodeId = nq.SubNodeCriteria.NodeId.ValueInt64()
@@ -101,22 +101,24 @@ func (d *nodesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			includeParent = nq.SubNodeCriteria.IncludeParent.ValueBool()
 		}
 		if nodeId > 0 {
-			for _, n := range d.nodes.GetData() {
-				if n.NodeId == nodeId {
+			d.nodes.GetAllEntities(func(n enterprise.INode) bool {
+				if n.NodeId() == nodeId {
 					nodes = append(nodes, n)
-					break
+					return false
 				}
-			}
+				return true
+			})
 			var pos = 0
 			for pos < len(nodes) {
-				nodeId = nodes[pos].NodeId
+				nodeId = nodes[pos].NodeId()
 				pos += 1
 				tflog.Warn(ctx, fmt.Sprintf("pos=%d; len=%d", pos, len(nodes)))
-				for _, n := range d.nodes.GetData() {
-					if n.ParentId == nodeId {
+				d.nodes.GetAllEntities(func(n enterprise.INode) bool {
+					if n.ParentId() == nodeId {
 						nodes = append(nodes, n)
 					}
-				}
+					return true
+				})
 				if !isCascade {
 					break
 				}
@@ -126,7 +128,9 @@ func (d *nodesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			}
 		}
 		for _, n := range nodes {
-			state.Nodes = append(state.Nodes, nodeModelFromKeeper(n))
+			var nm = new(nodeModel)
+			nm.fromKeeper(n)
+			state.Nodes = append(state.Nodes, nm)
 		}
 	} else if nq.Filter != nil {
 		var cb matcher
@@ -135,12 +139,14 @@ func (d *nodesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		for _, x := range d.nodes.GetData() {
-			var n = nodeModelFromKeeper(x)
-			if cb(n) {
-				state.Nodes = append(state.Nodes, n)
+		d.nodes.GetAllEntities(func(n enterprise.INode) bool {
+			var nm = new(nodeModel)
+			nm.fromKeeper(n)
+			if cb(nm) {
+				state.Nodes = append(state.Nodes, nm)
 			}
-		}
+			return true
+		})
 	}
 
 	diags = resp.State.Set(ctx, &state)
@@ -151,8 +157,8 @@ func (d *nodesDataSource) Configure(ctx context.Context, req datasource.Configur
 	if req.ProviderData == nil {
 		return
 	}
-	if loader, ok := req.ProviderData.(enterprise.IEnterpriseLoader); ok {
-		d.nodes = loader.EnterpriseData().Nodes()
+	if ed, ok := req.ProviderData.(enterprise.IEnterpriseData); ok {
+		d.nodes = ed.Nodes()
 	} else {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",

@@ -213,8 +213,9 @@ func (p *keeperEnterpriseProvider) Configure(ctx context.Context, req provider.C
 		return
 	}
 
-	resp.DataSourceData = loader
-	resp.ResourceData = loader
+	var management = enterprise.NewSyncEnterpriseManagement(loader)
+	resp.DataSourceData = loader.EnterpriseData()
+	resp.ResourceData = management
 }
 
 func (p *keeperEnterpriseProvider) Resources(ctx context.Context) []func() resource.Resource {
@@ -227,6 +228,6 @@ func (p *keeperEnterpriseProvider) DataSources(ctx context.Context) []func() dat
 	return []func() datasource.DataSource{
 		NewNodeDataSource, NewNodesDataSource,
 		NewTeamDataSource, NewTeamsDataSource,
-		NewUsersDataSource,
+		NewUserDataSource, NewUsersDataSource,
 	}
 }

@@ -14,32 +14,32 @@ type nodeModel struct {
 	ScimId               types.Int64   `tfsdk:"scim_id"`
 	DuoEnabled           types.Bool    `tfsdk:"duo_enabled"`
 	RsaEnabled           types.Bool    `tfsdk:"rsa_enabled"`
+	RestrictVisibility   types.Bool    `tfsdk:"restrict_visibility"`
 	SsoServiceProviderId []types.Int64 `tfsdk:"sso_provider_ids"`
 }
 
-func nodeModelFromKeeper(node *enterprise.Node) (model *nodeModel) {
-	model = &nodeModel{
-		NodeId:     types.Int64Value(node.NodeId),
-		Name:       types.StringValue(node.Name),
-		DuoEnabled: types.BoolValue(node.DuoEnabled),
-		RsaEnabled: types.BoolValue(node.RsaEnabled),
+func (model *nodeModel) fromKeeper(node enterprise.INode) {
+	model.NodeId = types.Int64Value(node.NodeId())
+	model.Name = types.StringValue(node.Name())
+	model.DuoEnabled = types.BoolValue(node.DuoEnabled())
+	model.RsaEnabled = types.BoolValue(node.RsaEnabled())
+	if node.ParentId() > 0 {
+		model.ParentId = types.Int64Value(node.ParentId())
 	}
-	if node.ParentId > 0 {
-		model.ParentId = types.Int64Value(node.ParentId)
+	if node.BridgeId() > 0 {
+		model.BridgeId = types.Int64Value(node.BridgeId())
 	}
-	if node.BridgeId > 0 {
-		model.BridgeId = types.Int64Value(node.BridgeId)
+	if node.ScimId() > 0 {
+		model.ScimId = types.Int64Value(node.ScimId())
 	}
-	if node.ScimId > 0 {
-		model.ScimId = types.Int64Value(node.ScimId)
+	if node.RestrictVisibility() {
+		model.RestrictVisibility = types.BoolValue(true)
 	}
-	if len(node.SsoServiceProviderId) > 0 {
-		for _, x := range node.SsoServiceProviderId {
+	if len(node.SsoServiceProviderId()) > 0 {
+		for _, x := range node.SsoServiceProviderId() {
 			model.SsoServiceProviderId = append(model.SsoServiceProviderId, types.Int64Value(x))
 		}
 	}
-
-	return
 }
 
 var nodeSchemaAttributes = map[string]schema.Attribute{
@@ -70,6 +70,10 @@ var nodeSchemaAttributes = map[string]schema.Attribute{
 	"rsa_enabled": schema.BoolAttribute{
 		Computed:    true,
 		Description: "RSA Configured",
+	},
+	"restrict_visibility": schema.BoolAttribute{
+		Computed:    true,
+		Description: "Restrict Node Visibility",
 	},
 	"sso_provider_ids": schema.ListAttribute{
 		Computed:    true,

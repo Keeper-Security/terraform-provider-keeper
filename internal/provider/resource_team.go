@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -20,7 +19,7 @@ func NewTeamResource() resource.Resource {
 }
 
 type teamResource struct {
-	enterprise enterprise.IEnterpriseLoader
+	management enterprise.IEnterpriseManagement
 }
 
 func (r *teamResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -72,7 +71,7 @@ func (r *teamResource) Configure(_ context.Context, req resource.ConfigureReques
 		return
 	}
 
-	ent, ok := req.ProviderData.(enterprise.IEnterpriseLoader)
+	mgmt, ok := req.ProviderData.(enterprise.IEnterpriseManagement)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
@@ -82,7 +81,7 @@ func (r *teamResource) Configure(_ context.Context, req resource.ConfigureReques
 		return
 	}
 
-	r.enterprise = ent
+	r.management = mgmt
 }
 
 func (r *teamResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -90,30 +89,33 @@ func (r *teamResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	if resp.Diagnostics.Append(req.State.Get(ctx, &state)...); resp.Diagnostics.HasError() {
 		return
 	}
-	var teams = r.enterprise.EnterpriseData().Teams().GetData()
+
+	var teams = r.management.EnterpriseData().Teams()
 	if state.NodeId.IsNull() || state.NodeId.ValueInt64() == 0 {
-		state.NodeId = types.Int64Value(r.enterprise.EnterpriseData().GetRootNode().NodeId)
+		state.NodeId = types.Int64Value(r.management.EnterpriseData().GetRootNode().NodeId())
 	}
-	var team *enterprise.Team
+
+	var team enterprise.ITeam
 	if state.TeamUid.IsNull() {
 		var teamName = state.Name.ValueString()
 		var nodeId = state.NodeId.ValueInt64()
-		for _, t := range teams {
-			if t.NodeId == nodeId && strings.EqualFold(t.Name, teamName) {
+		teams.GetAllEntities(func(t enterprise.ITeam) bool {
+			if t.NodeId() == nodeId && strings.EqualFold(t.Name(), teamName) {
 				team = t
-				break
+				return false
 			}
-		}
+			return true
+		})
 	} else {
-		var tUid = state.TeamUid.ValueString()
-		if len(tUid) > 0 {
-			var teamUid = api.Base64UrlDecode(tUid)
-			for _, t := range teams {
-				if bytes.Compare(t.TeamUid, teamUid) == 0 {
+		var teamUid = state.TeamUid.ValueString()
+		if len(teamUid) > 0 {
+			teams.GetAllEntities(func(t enterprise.ITeam) bool {
+				if t.TeamUid() == teamUid {
 					team = t
-					break
+					return false
 				}
-			}
+				return true
+			})
 		}
 	}
 
@@ -138,7 +140,7 @@ func (r *teamResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		plan.NodeId = state.NodeId
 	}
 	if plan.NodeId.IsNull() || plan.NodeId.ValueInt64() == 0 {
-		plan.NodeId = types.Int64Value(r.enterprise.EnterpriseData().GetRootNode().NodeId)
+		plan.NodeId = types.Int64Value(r.management.EnterpriseData().GetRootNode().NodeId())
 	}
 	if plan.TeamUid.IsNull() {
 		plan.TeamUid = state.TeamUid
@@ -151,26 +153,20 @@ func (r *teamResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	var t = &enterprise.Team{
-		TeamUid: api.Base64UrlDecode(plan.TeamUid.ValueString()),
-	}
+	var teamUid = plan.TeamUid.ValueString()
+	var t = enterprise.NewTeam(teamUid)
 	plan.toKeeper(t)
 
-	var er error
-	if er1 := enterprise.PutTeams(r.enterprise, nil, []*enterprise.Team{t}, nil, func(_ []byte, err error) {
-		er = err
-	}); er1 != nil {
-		er = er1
-	}
-	if er != nil {
+	errs := r.management.ModifyTeams(nil, []enterprise.ITeam{t}, nil)
+	for _, er := range errs {
 		resp.Diagnostics.AddError(
 			fmt.Sprintf("Update Team %s", plan.Name.ValueString()),
 			"Error occurred while updating a team: "+er.Error(),
 		)
-		return
 	}
-	_ = r.enterprise.Load()
-	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+	if !resp.Diagnostics.HasError() {
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+	}
 }
 
 func (r *teamResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -190,47 +186,43 @@ func (r *teamResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 	if plan.NodeId.IsNull() || plan.NodeId.ValueInt64() == 0 {
-		plan.NodeId = types.Int64Value(r.enterprise.EnterpriseData().GetRootNode().NodeId)
+		plan.NodeId = types.Int64Value(r.management.EnterpriseData().GetRootNode().NodeId())
 	}
 	var nodeId = plan.NodeId.ValueInt64()
-	var team *enterprise.Team
-	for _, t := range r.enterprise.EnterpriseData().Teams().GetData() {
-		if t.NodeId == nodeId && strings.EqualFold(t.Name, teamName) {
+	var teams = r.management.EnterpriseData().Teams()
+	var team enterprise.ITeam
+	teams.GetAllEntities(func(t enterprise.ITeam) bool {
+		if t.NodeId() == nodeId && strings.EqualFold(t.Name(), teamName) {
 			team = t
-			break
+			return false
 		}
-	}
-	if team == nil {
-		team = new(enterprise.Team)
-	} else {
-		plan.TeamUid = types.StringValue(api.Base64UrlEncode(team.TeamUid))
-	}
-	plan.toKeeper(team)
+		return true
+	})
 
-	var forInsert []*enterprise.Team
-	var forUpdate []*enterprise.Team
-	if team.TeamUid == nil {
-		forInsert = append(forInsert, team)
+	var forInsert []enterprise.ITeam
+	var forUpdate []enterprise.ITeam
+	var te enterprise.ITeamEdit
+	if team == nil {
+		te = enterprise.NewTeam(api.Base64UrlEncode(api.GenerateUid()))
+		forInsert = append(forInsert, te)
 	} else {
-		forUpdate = append(forUpdate, team)
+		te = enterprise.CloneTeam(team)
+		forUpdate = append(forUpdate, te)
 	}
-	var er error
-	if er1 := enterprise.PutTeams(r.enterprise, forInsert, forUpdate, nil, func(_ []byte, err error) {
-		er = err
-	}); er1 != nil {
-		er = er1
-	}
-	if er != nil {
+	plan.toKeeper(te)
+
+	var errs = r.management.ModifyTeams(forInsert, forUpdate, nil)
+	for _, er := range errs {
 		resp.Diagnostics.AddError(
 			fmt.Sprintf("Create Team %s", teamName),
 			fmt.Sprintf("Error: %s", er),
 		)
-		return
 	}
-	_ = r.enterprise.Load()
-	plan.TeamUid = types.StringValue(api.Base64UrlEncode(team.TeamUid))
-	plan.NodeId = types.Int64Value(team.NodeId)
-	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+	if !resp.Diagnostics.HasError() {
+		plan.TeamUid = types.StringValue(te.TeamUid())
+		plan.NodeId = types.Int64Value(te.NodeId())
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+	}
 }
 
 func (r *teamResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -239,19 +231,12 @@ func (r *teamResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	if resp.Diagnostics.Append(req.State.Get(ctx, &state)...); resp.Diagnostics.HasError() {
 		return
 	}
-	var forDelete = [][]byte{api.Base64UrlDecode(state.TeamUid.ValueString())}
-	var er error
-	if er1 := enterprise.PutTeams(r.enterprise, nil, nil, forDelete, func(_ []byte, err error) {
-		er = err
-	}); er1 != nil {
-		er = er1
-	}
-	if er != nil {
+	var forDelete = []string{state.TeamUid.ValueString()}
+	var errs = r.management.ModifyTeams(nil, nil, forDelete)
+	for _, er := range errs {
 		resp.Diagnostics.AddError(
-			fmt.Sprintf("Delete Team %s", state.Name.ValueString()),
+			fmt.Sprintf("Delete Team \"%s\" error: %s", state.Name.ValueString(), er),
 			"Error occurred while creating a team",
 		)
-		return
 	}
-	_ = r.enterprise.Load()
 }
