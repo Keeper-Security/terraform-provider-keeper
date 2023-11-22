@@ -54,8 +54,9 @@ func (model *nodeDataSourceModel) fromKeeper(node enterprise.INode) {
 }
 
 type nodeDataSource struct {
-	nodes   enterprise.IEnterpriseEntity[enterprise.INode, int64]
-	bridges enterprise.IEnterpriseEntity[enterprise.IBridge, int64]
+	rootNode enterprise.INode
+	nodes    enterprise.IEnterpriseEntity[enterprise.INode, int64]
+	bridges  enterprise.IEnterpriseEntity[enterprise.IBridge, int64]
 }
 
 func NewNodeDataSource() datasource.DataSource {
@@ -80,6 +81,10 @@ func (d *nodeDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			Optional:    true,
 			Description: "Node Name",
 		},
+		"parent_id": schema.Int64Attribute{
+			Optional:    true,
+			Description: "Parent Node ID",
+		},
 	}
 	resp.Schema = schema.Schema{
 		Attributes: mergeMaps(filterAttributes, nodeSchemaAttributes),
@@ -95,14 +100,16 @@ func (d *nodeDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
+	var node enterprise.INode
 	var m func(node enterprise.INode) bool
+
 	if !nq.IsRoot.IsNull() && nq.IsRoot.ValueBool() {
+		node = d.rootNode
+	} else if !nq.Name.IsNull() && !nq.ParentId.IsNull() {
+		var nodeName = nq.Name.ValueString()
+		var parentId = nq.ParentId.ValueInt64()
 		m = func(node enterprise.INode) bool {
-			return node.ParentId() == 0
-		}
-	} else if !nq.Name.IsNull() && !nq.Name.IsUnknown() {
-		m = func(node enterprise.INode) bool {
-			return strings.EqualFold(nq.Name.ValueString(), node.Name())
+			return node.ParentId() == parentId && strings.EqualFold(nodeName, node.Name())
 		}
 	} else if !nq.NodeId.IsNull() && !nq.NodeId.IsUnknown() {
 		m = func(node enterprise.INode) bool {
@@ -110,22 +117,22 @@ func (d *nodeDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		}
 	}
 
-	if m == nil {
+	if node == nil && m == nil {
 		resp.Diagnostics.AddError(
 			"Search criteria is not provided for \"node\" data source",
 			fmt.Sprintf("Search criteria is not provided for \"node\" data source"),
 		)
 		return
 	}
-
-	var node enterprise.INode
-	d.nodes.GetAllEntities(func(n enterprise.INode) bool {
-		if m(n) {
-			node = n
-			return false
-		}
-		return true
-	})
+	if node == nil && m != nil {
+		d.nodes.GetAllEntities(func(n enterprise.INode) bool {
+			if m(n) {
+				node = n
+				return false
+			}
+			return true
+		})
+	}
 
 	if node == nil {
 		resp.Diagnostics.AddError(
@@ -149,6 +156,7 @@ func (d *nodeDataSource) Configure(ctx context.Context, req datasource.Configure
 	if ed, ok := req.ProviderData.(enterprise.IEnterpriseData); ok {
 		d.nodes = ed.Nodes()
 		d.bridges = ed.Bridges()
+		d.rootNode = ed.GetRootNode()
 	} else {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
@@ -163,6 +171,10 @@ func (d *nodeDataSource) ConfigValidators(ctx context.Context) []datasource.Conf
 			path.MatchRoot("is_root"),
 			path.MatchRoot("node_id"),
 			path.MatchRoot("name"),
+		),
+		datasourcevalidator.RequiredTogether(
+			path.MatchRoot("name"),
+			path.MatchRoot("parent_id"),
 		),
 	}
 }
