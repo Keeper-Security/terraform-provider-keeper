@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -14,7 +15,7 @@ import (
 	"strings"
 )
 
-func NewTeamResource() resource.Resource {
+func newTeamResource() resource.Resource {
 	return &teamResource{}
 }
 
@@ -75,7 +76,7 @@ func (r *teamResource) Configure(_ context.Context, req resource.ConfigureReques
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected IEnterpriseLoader, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected IEnterpriseManagement, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
@@ -99,6 +100,7 @@ func (r *teamResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	if state.TeamUid.IsNull() {
 		var teamName = state.Name.ValueString()
 		var nodeId = state.NodeId.ValueInt64()
+
 		teams.GetAllEntities(func(t enterprise.ITeam) bool {
 			if t.NodeId() == nodeId && strings.EqualFold(t.Name(), teamName) {
 				team = t
@@ -109,13 +111,7 @@ func (r *teamResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	} else {
 		var teamUid = state.TeamUid.ValueString()
 		if len(teamUid) > 0 {
-			teams.GetAllEntities(func(t enterprise.ITeam) bool {
-				if t.TeamUid() == teamUid {
-					team = t
-					return false
-				}
-				return true
-			})
+			team = teams.GetEntity(teamUid)
 		}
 	}
 
@@ -124,6 +120,67 @@ func (r *teamResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	} else {
 		resp.State.RemoveResource(ctx)
+	}
+}
+
+func (r *teamResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resource.ImportStatePassthroughID(ctx, path.Root("team_uid"), req, resp)
+}
+
+func (r *teamResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan teamModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var teamName = plan.Name.ValueString()
+	if len(teamName) == 0 {
+		resp.Diagnostics.AddError(
+			"Create Team: Team name cannot be empty",
+			"Team name cannot be empty",
+		)
+		return
+	}
+
+	if plan.NodeId.IsNull() || plan.NodeId.ValueInt64() == 0 {
+		plan.NodeId = types.Int64Value(r.management.EnterpriseData().GetRootNode().NodeId())
+	}
+
+	var team enterprise.ITeam
+	var nodeId = plan.NodeId.ValueInt64()
+	var teams = r.management.EnterpriseData().Teams()
+	teams.GetAllEntities(func(t enterprise.ITeam) bool {
+		if t.NodeId() == nodeId && strings.EqualFold(t.Name(), teamName) {
+			team = t
+			return false
+		}
+		return true
+	})
+	var te enterprise.ITeamEdit
+	var toAdd []enterprise.ITeam
+	var toUpdate []enterprise.ITeam
+	if team == nil {
+		te = enterprise.NewTeam(api.Base64UrlEncode(api.GenerateUid()))
+		toAdd = append(toAdd, te)
+	} else {
+		te = enterprise.CloneTeam(team)
+		toUpdate = append(toUpdate, te)
+	}
+	plan.toKeeper(te)
+
+	var errs = r.management.ModifyTeams(toAdd, toUpdate, nil)
+	for _, er := range errs {
+		resp.Diagnostics.AddError(
+			fmt.Sprintf("Create Team %s", teamName),
+			fmt.Sprintf("Error: %s", er),
+		)
+	}
+	if !resp.Diagnostics.HasError() {
+		plan.TeamUid = types.StringValue(te.TeamUid())
+		plan.NodeId = types.Int64Value(te.NodeId())
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 	}
 }
 
@@ -165,62 +222,6 @@ func (r *teamResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		)
 	}
 	if !resp.Diagnostics.HasError() {
-		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
-	}
-}
-
-func (r *teamResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan teamModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	var teamName = plan.Name.ValueString()
-	if len(teamName) == 0 {
-		resp.Diagnostics.AddError(
-			"Create Team: Team name cannot be empty",
-			"Team name cannot be empty",
-		)
-		return
-	}
-	if plan.NodeId.IsNull() || plan.NodeId.ValueInt64() == 0 {
-		plan.NodeId = types.Int64Value(r.management.EnterpriseData().GetRootNode().NodeId())
-	}
-	var nodeId = plan.NodeId.ValueInt64()
-	var teams = r.management.EnterpriseData().Teams()
-	var team enterprise.ITeam
-	teams.GetAllEntities(func(t enterprise.ITeam) bool {
-		if t.NodeId() == nodeId && strings.EqualFold(t.Name(), teamName) {
-			team = t
-			return false
-		}
-		return true
-	})
-
-	var forInsert []enterprise.ITeam
-	var forUpdate []enterprise.ITeam
-	var te enterprise.ITeamEdit
-	if team == nil {
-		te = enterprise.NewTeam(api.Base64UrlEncode(api.GenerateUid()))
-		forInsert = append(forInsert, te)
-	} else {
-		te = enterprise.CloneTeam(team)
-		forUpdate = append(forUpdate, te)
-	}
-	plan.toKeeper(te)
-
-	var errs = r.management.ModifyTeams(forInsert, forUpdate, nil)
-	for _, er := range errs {
-		resp.Diagnostics.AddError(
-			fmt.Sprintf("Create Team %s", teamName),
-			fmt.Sprintf("Error: %s", er),
-		)
-	}
-	if !resp.Diagnostics.HasError() {
-		plan.TeamUid = types.StringValue(te.TeamUid())
-		plan.NodeId = types.Int64Value(te.NodeId())
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 	}
 }

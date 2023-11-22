@@ -85,25 +85,14 @@ data "keeper-enterprise_teams" "teams" {  // -> IDs
 #  }
 #}
 
-#data "kepr_node" "root" {
-#  is_root = true
-#  //name = "nnd"
-#}
-
 #data "kepr_users" "active" {
 #  emails = ["skol@skolupaev.info", "sergey+a2@callpod.com"]
 #}
 
-#resource "kepr_team" "team33" {
-#    name = "Team33"
-#    node_id = 820338837337
-#    restrict_share = true
+#data "kepr_team" "vault" {
+#  name = "Vault"
+#  include_users = true
 #}
-
-data "kepr_team" "vault" {
-  name = "Vault"
-  include_users = true
-}
 
 #resource "kepr_team_users" "vault_users" {
 #  team_uid = resource.vault.team_uid
@@ -119,6 +108,24 @@ data "kepr_team" "vault" {
 #  }
 #}
 
- output "example" {
-   value = data.kepr_team.vault
+data "kepr_node" "root" {
+  is_root = true
+}
+
+data "kepr_node" "azure" {
+  name = "Azure Cloud"
+  parent_id = data.kepr_node.root.node_id
+}
+
+resource "kepr_node" "new" {
+  name = "New Node"
+  parent_id = data.kepr_node.azure.node_id
+}
+resource "kepr_team" "team55" {
+    name = "Team55"
+    node_id = resource.kepr_node.new.node_id
+}
+
+output "example" {
+   value = data.kepr_node.azure
  }

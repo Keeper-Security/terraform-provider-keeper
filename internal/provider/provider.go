@@ -220,7 +220,7 @@ func (p *keeperEnterpriseProvider) Configure(ctx context.Context, req provider.C
 
 func (p *keeperEnterpriseProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewTeamResource,
+		newTeamResource, newNodeResource,
 	}
 }
 
