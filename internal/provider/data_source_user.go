@@ -17,29 +17,25 @@ var (
 )
 
 type userDataSourceModel struct {
-	EnterpriseUserId types.Int64  `tfsdk:"user_id"`
-	Username         types.String `tfsdk:"username"`
-
-	NodeId                 types.Int64  `tfsdk:"node_id"`
-	Status                 types.String `tfsdk:"status"`
-	Lock                   types.Int64  `tfsdk:"lock"`
-	AccountShareExpiration types.Int64  `tfsdk:"account_share_expiration"`
-	TfaEnabled             types.Bool   `tfsdk:"tfa_enabled"`
-	FullName               types.String `tfsdk:"full_name"`
-	JobTitle               types.String `tfsdk:"job_title"`
-
-	IncludeTeams types.Bool        `tfsdk:"include_teams"`
-	Teams        []*teamShortModel `tfsdk:"teams"`
-	//IncludeRoles types.Bool        `tfsdk:"include_roles"`
-	//Roles        []*roleShortModel `tfsdk:"roles"`
+	EnterpriseUserId       types.Int64       `tfsdk:"enterprise_user_id"`
+	Username               types.String      `tfsdk:"username"`
+	NodeId                 types.Int64       `tfsdk:"node_id"`
+	Status                 types.String      `tfsdk:"status"`
+	AccountShareExpiration types.Int64       `tfsdk:"account_share_expiration"`
+	TfaEnabled             types.Bool        `tfsdk:"tfa_enabled"`
+	FullName               types.String      `tfsdk:"full_name"`
+	JobTitle               types.String      `tfsdk:"job_title"`
+	IncludeTeams           types.Bool        `tfsdk:"include_teams"`
+	Teams                  []*teamShortModel `tfsdk:"teams"`
+	IncludeRoles           types.Bool        `tfsdk:"include_roles"`
+	Roles                  []*roleShortModel `tfsdk:"roles"`
 }
 
 func (model *userDataSourceModel) fromKeeper(keeper enterprise.IUser) {
 	model.EnterpriseUserId = types.Int64Value(keeper.EnterpriseUserId())
 	model.Username = types.StringValue(keeper.Username())
 	model.NodeId = types.Int64Value(keeper.NodeId())
-	model.Status = types.StringValue(keeper.Status())
-	model.Lock = types.Int64Value(int64(keeper.Lock()))
+	model.Status = types.StringValue(getUserStatus(keeper))
 	model.TfaEnabled = types.BoolValue(keeper.TfaEnabled())
 	if len(keeper.FullName()) > 0 {
 		model.FullName = types.StringValue(keeper.FullName())
@@ -59,9 +55,12 @@ func (model *userDataSourceModel) fromKeeper(keeper enterprise.IUser) {
 }
 
 type userDataSource struct {
-	users     enterprise.IEnterpriseEntity[enterprise.IUser, int64]
-	teams     enterprise.IEnterpriseEntity[enterprise.ITeam, string]
-	teamUsers enterprise.IEnterpriseLink[enterprise.ITeamUser, string, int64]
+	users        enterprise.IEnterpriseEntity[enterprise.IUser, int64]
+	teams        enterprise.IEnterpriseEntity[enterprise.ITeam, string]
+	teamUsers    enterprise.IEnterpriseLink[enterprise.ITeamUser, string, int64]
+	roles        enterprise.IEnterpriseEntity[enterprise.IRole, int64]
+	roleUsers    enterprise.IEnterpriseLink[enterprise.IRoleUser, int64, int64]
+	managedNodes enterprise.IEnterpriseLink[enterprise.IManagedNode, int64, int64]
 }
 
 func NewUserDataSource() datasource.DataSource {
@@ -75,7 +74,7 @@ func (d *userDataSource) Metadata(_ context.Context, req datasource.MetadataRequ
 // Schema defines the schema for the data source.
 func (d *userDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	var filterAttributes = map[string]schema.Attribute{
-		"user_id": schema.Int64Attribute{
+		"enterprise_user_id": schema.Int64Attribute{
 			Optional:    true,
 			Description: "Enterprise User ID",
 		},
@@ -87,6 +86,10 @@ func (d *userDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			Optional:    true,
 			Description: "Include user teams",
 		},
+		"include_roles": schema.BoolAttribute{
+			Optional:    true,
+			Description: "Include user roles",
+		},
 	}
 	var teamShortAttribute = map[string]schema.Attribute{
 		"teams": schema.ListNestedAttribute{
@@ -96,8 +99,36 @@ func (d *userDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			},
 		},
 	}
+	var roleShortAttribute = map[string]schema.Attribute{
+		"roles": schema.ListNestedAttribute{
+			Computed: true,
+			NestedObject: schema.NestedAttributeObject{
+				Attributes: roleShortSchemaAttributes,
+			},
+		},
+	}
+
 	resp.Schema = schema.Schema{
-		Attributes: mergeMaps(filterAttributes, userSchemaAttributes, teamShortAttribute),
+		Attributes: mergeMaps(filterAttributes, userSchemaAttributes, teamShortAttribute, roleShortAttribute),
+	}
+}
+
+func (d *userDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+	if ed, ok := req.ProviderData.(enterprise.IEnterpriseData); ok {
+		d.users = ed.Users()
+		d.teams = ed.Teams()
+		d.teamUsers = ed.TeamUsers()
+		d.roles = ed.Roles()
+		d.roleUsers = ed.RoleUsers()
+		d.managedNodes = ed.ManagedNodes()
+	} else {
+		resp.Diagnostics.AddError(
+			"Unexpected Data Source Configure Type",
+			fmt.Sprintf("Expected \"IEnterpriseData\", got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
 	}
 }
 
@@ -154,37 +185,39 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		d.teamUsers.GetLinksByObject(user.EnterpriseUserId(), func(tu enterprise.ITeamUser) bool {
 			var t = d.teams.GetEntity(tu.TeamUid())
 			if t != nil {
-				var tm = new(teamShortModel)
-				tm.fromKeeper(t)
-				state.Teams = append(state.Teams, tm)
+				var tsm = new(teamShortModel)
+				tsm.fromKeeper(t)
+				state.Teams = append(state.Teams, tsm)
 			}
 			return true
 		})
 	}
+
+	if !state.IncludeRoles.IsNull() && state.IncludeRoles.ValueBool() {
+		d.roleUsers.GetLinksByObject(user.EnterpriseUserId(), func(ru enterprise.IRoleUser) bool {
+			var r = d.roles.GetEntity(ru.RoleId())
+			if r != nil {
+				var rsm = new(roleShortModel)
+				var isAdmin bool
+				d.managedNodes.GetLinksBySubject(ru.RoleId(), func(_ enterprise.IManagedNode) bool {
+					isAdmin = true
+					return false
+				})
+				rsm.fromKeeper(r, isAdmin)
+				state.Roles = append(state.Roles, rsm)
+			}
+			return true
+		})
+	}
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
-}
-
-func (d *userDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-	if ed, ok := req.ProviderData.(enterprise.IEnterpriseData); ok {
-		d.users = ed.Users()
-		d.teams = ed.Teams()
-		d.teamUsers = ed.TeamUsers()
-	} else {
-		resp.Diagnostics.AddError(
-			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected \"IEnterpriseData\", got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
-	}
 }
 
 func (d *userDataSource) ConfigValidators(ctx context.Context) []datasource.ConfigValidator {
 	return []datasource.ConfigValidator{
 		datasourcevalidator.Conflicting(
-			path.MatchRoot("user_id"),
+			path.MatchRoot("enterprise_user_id"),
 			path.MatchRoot("username"),
 		),
 	}

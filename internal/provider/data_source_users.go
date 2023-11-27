@@ -69,6 +69,20 @@ func (d *usersDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 	}
 }
 
+func (d *usersDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+	if ed, ok := req.ProviderData.(enterprise.IEnterpriseData); ok {
+		d.users = ed.Users()
+	} else {
+		resp.Diagnostics.AddError(
+			"Unexpected Data Source Configure Type",
+			fmt.Sprintf("Expected \"IEnterpriseLoader\", got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+	}
+}
+
 func (d *usersDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var uq usersDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &uq)...)
@@ -171,20 +185,6 @@ func (d *usersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-}
-
-func (d *usersDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-	if ed, ok := req.ProviderData.(enterprise.IEnterpriseData); ok {
-		d.users = ed.Users()
-	} else {
-		resp.Diagnostics.AddError(
-			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected \"IEnterpriseLoader\", got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
-	}
 }
 
 func (d *usersDataSource) ConfigValidators(ctx context.Context) []datasource.ConfigValidator {

@@ -60,22 +60,18 @@ type userModel struct {
 	Username               types.String `tfsdk:"username"`
 	NodeId                 types.Int64  `tfsdk:"node_id"`
 	Status                 types.String `tfsdk:"status"`
-	Lock                   types.Int64  `tfsdk:"lock"` // TODO merge lock and status
 	AccountShareExpiration types.Int64  `tfsdk:"account_share_expiration"`
 	TfaEnabled             types.Bool   `tfsdk:"tfa_enabled"`
-	//UserId                 types.Int64  `tfsdk:"user_id"`
-	FullName types.String `tfsdk:"full_name"`
-	JobTitle types.String `tfsdk:"job_title"`
+	FullName               types.String `tfsdk:"full_name"`
+	JobTitle               types.String `tfsdk:"job_title"`
 }
 
 func (model *userModel) fromKeeper(keeper enterprise.IUser) {
 	model.EnterpriseUserId = types.Int64Value(keeper.EnterpriseUserId())
 	model.Username = types.StringValue(keeper.Username())
 	model.NodeId = types.Int64Value(keeper.NodeId())
-	model.Status = types.StringValue(keeper.Status())
-	model.Lock = types.Int64Value(int64(keeper.Lock()))
+	model.Status = types.StringValue(getUserStatus(keeper))
 	model.TfaEnabled = types.BoolValue(keeper.TfaEnabled())
-	//model.UserId = types.Int64Value(int64(keeper.UserId))
 	if len(keeper.FullName()) > 0 {
 		model.FullName = types.StringValue(keeper.FullName())
 	} else {
@@ -108,11 +104,7 @@ var userSchemaAttributes = map[string]schema.Attribute{
 	},
 	"status": schema.StringAttribute{
 		Computed:    true,
-		Description: "User Status: active | invited",
-	},
-	"lock": schema.Int64Attribute{
-		Computed:    true,
-		Description: "User Lock Status: 0 - unlocked, 1 - locked, 2 - disabled",
+		Description: "User Status: active | invited | locked | blocked | disabled",
 	},
 	"tfa_enabled": schema.BoolAttribute{
 		Computed:    true,
@@ -122,10 +114,6 @@ var userSchemaAttributes = map[string]schema.Attribute{
 		Computed:    true,
 		Description: "Account Share deadline: Timestamp in millis",
 	},
-	//"user_id": schema.Int64Attribute{
-	//	Computed:    true,
-	//	Description: "Keeper User ID",
-	//},
 	"full_name": schema.StringAttribute{
 		Computed:    true,
 		Description: "User Full Name",
