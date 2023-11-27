@@ -88,6 +88,7 @@ func (d *teamsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			}
 		}
 		var team = new(teamModel)
+		team.fromKeeper(t)
 		if fm != nil {
 			if !fm(team) {
 				return true

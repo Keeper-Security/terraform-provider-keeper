@@ -17,14 +17,15 @@ var (
 )
 
 type teamDataSourceModel struct {
-	TeamUid       types.String      `tfsdk:"team_uid"`
-	Name          types.String      `tfsdk:"name"`
-	NodeId        types.Int64       `tfsdk:"node_id"`
-	RestrictEdit  types.Bool        `tfsdk:"restrict_edit"`
-	RestrictShare types.Bool        `tfsdk:"restrict_share"`
-	RestrictView  types.Bool        `tfsdk:"restrict_view"`
-	IncludeUsers  types.Bool        `tfsdk:"include_users"`
-	Users         []*userShortModel `tfsdk:"users"`
+	TeamUid        types.String      `tfsdk:"team_uid"`
+	Name           types.String      `tfsdk:"name"`
+	NodeId         types.Int64       `tfsdk:"node_id"`
+	RestrictEdit   types.Bool        `tfsdk:"restrict_edit"`
+	RestrictShare  types.Bool        `tfsdk:"restrict_share"`
+	RestrictView   types.Bool        `tfsdk:"restrict_view"`
+	IncludeMembers types.Bool        `tfsdk:"include_members"`
+	Users          []*userShortModel `tfsdk:"users"`
+	Roles          []*roleShortModel `tfsdk:"roles"`
 }
 
 func (model *teamDataSourceModel) fromKeeper(keeper enterprise.ITeam) {
@@ -37,9 +38,12 @@ func (model *teamDataSourceModel) fromKeeper(keeper enterprise.ITeam) {
 }
 
 type teamDataSource struct {
-	teams     enterprise.IEnterpriseEntity[enterprise.ITeam, string]
-	teamUsers enterprise.IEnterpriseLink[enterprise.ITeamUser, string, int64]
-	users     enterprise.IEnterpriseEntity[enterprise.IUser, int64]
+	teams        enterprise.IEnterpriseEntity[enterprise.ITeam, string]
+	teamUsers    enterprise.IEnterpriseLink[enterprise.ITeamUser, string, int64]
+	users        enterprise.IEnterpriseEntity[enterprise.IUser, int64]
+	roleTeams    enterprise.IEnterpriseLink[enterprise.IRoleTeam, int64, string]
+	roles        enterprise.IEnterpriseEntity[enterprise.IRole, int64]
+	managedNodes enterprise.IEnterpriseLink[enterprise.IManagedNode, int64, int64]
 }
 
 func NewTeamDataSource() datasource.DataSource {
@@ -61,9 +65,9 @@ func (d *teamDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			Optional:    true,
 			Description: "Team Name",
 		},
-		"include_users": schema.BoolAttribute{
+		"include_members": schema.BoolAttribute{
 			Optional:    true,
-			Description: "Include team users",
+			Description: "Include team members",
 		},
 	}
 	var usersAttribute = map[string]schema.Attribute{
@@ -74,8 +78,35 @@ func (d *teamDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			},
 		},
 	}
+	var rolesAttribute = map[string]schema.Attribute{
+		"roles": schema.ListNestedAttribute{
+			Computed: true,
+			NestedObject: schema.NestedAttributeObject{
+				Attributes: roleShortSchemaAttributes,
+			},
+		},
+	}
 	resp.Schema = schema.Schema{
-		Attributes: mergeMaps(filterAttributes, teamSchemaAttributes, usersAttribute),
+		Attributes: mergeMaps(filterAttributes, teamSchemaAttributes, usersAttribute, rolesAttribute),
+	}
+}
+
+func (d *teamDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+	if ed, ok := req.ProviderData.(enterprise.IEnterpriseData); ok {
+		d.teams = ed.Teams()
+		d.teamUsers = ed.TeamUsers()
+		d.users = ed.Users()
+		d.roleTeams = ed.RoleTeams()
+		d.roles = ed.Roles()
+
+	} else {
+		resp.Diagnostics.AddError(
+			"Unexpected Data Source Configure Type",
+			fmt.Sprintf("Expected \"IEnterpriseData\", got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
 	}
 }
 
@@ -126,7 +157,7 @@ func (d *teamDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	var state = tq
 	var tm = &state
 	tm.fromKeeper(team)
-	if !state.IncludeUsers.IsNull() && state.IncludeUsers.ValueBool() {
+	if !state.IncludeMembers.IsNull() && state.IncludeMembers.ValueBool() {
 		d.teamUsers.GetLinksBySubject(team.TeamUid(), func(tu enterprise.ITeamUser) bool {
 			var u = d.users.GetEntity(tu.EnterpriseUserId())
 			if u != nil {
@@ -136,25 +167,23 @@ func (d *teamDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 			}
 			return true
 		})
+		d.roleTeams.GetLinksByObject(team.TeamUid(), func(rt enterprise.IRoleTeam) bool {
+			var r = d.roles.GetEntity(rt.RoleId())
+			if r != nil {
+				var rsm = new(roleShortModel)
+				var isAdmin bool
+				d.managedNodes.GetLinksBySubject(rt.RoleId(), func(_ enterprise.IManagedNode) bool {
+					isAdmin = true
+					return false
+				})
+				rsm.fromKeeper(r, isAdmin)
+				state.Roles = append(state.Roles, rsm)
+			}
+			return true
+		})
 	}
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
-}
-
-func (d *teamDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-	if ed, ok := req.ProviderData.(enterprise.IEnterpriseData); ok {
-		d.teams = ed.Teams()
-		d.teamUsers = ed.TeamUsers()
-		d.users = ed.Users()
-	} else {
-		resp.Diagnostics.AddError(
-			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected \"IEnterpriseData\", got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
-	}
 }
 
 func (d *teamDataSource) ConfigValidators(ctx context.Context) []datasource.ConfigValidator {

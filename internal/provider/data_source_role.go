@@ -17,14 +17,15 @@ var (
 )
 
 type roleDataSourceModel struct {
-	RoleId         types.Int64       `tfsdk:"role_id"`
-	Name           types.String      `tfsdk:"name"`
-	NodeId         types.Int64       `tfsdk:"node_id"`
-	VisibleBelow   types.Bool        `tfsdk:"visible_below"`
-	NewUserInherit types.Bool        `tfsdk:"new_user_inherit"`
-	ManagedNodes   *managedNodeModel `tfsdk:"managed_nodes"`
-	IncludeUsers   types.Bool        `tfsdk:"include_users"`
-	Users          []*userShortModel `tfsdk:"users"`
+	RoleId         types.Int64         `tfsdk:"role_id"`
+	Name           types.String        `tfsdk:"name"`
+	NodeId         types.Int64         `tfsdk:"node_id"`
+	VisibleBelow   types.Bool          `tfsdk:"visible_below"`
+	NewUserInherit types.Bool          `tfsdk:"new_user_inherit"`
+	ManagedNodes   []*managedNodeModel `tfsdk:"managed_nodes"`
+	IncludeMembers types.Bool          `tfsdk:"include_members"`
+	Users          []*userShortModel   `tfsdk:"users"`
+	Teams          []*teamShortModel   `tfsdk:"teams"`
 }
 
 func (model *roleDataSourceModel) fromKeeper(role enterprise.IRole) {
@@ -39,8 +40,11 @@ type roleDataSource struct {
 	roles          enterprise.IEnterpriseEntity[enterprise.IRole, int64]
 	roleUsers      enterprise.IEnterpriseLink[enterprise.IRoleUser, int64, int64]
 	users          enterprise.IEnterpriseEntity[enterprise.IUser, int64]
+	nodes          enterprise.IEnterpriseEntity[enterprise.INode, int64]
 	managedNodes   enterprise.IEnterpriseLink[enterprise.IManagedNode, int64, int64]
 	rolePrivileges enterprise.IEnterpriseLink[enterprise.IRolePrivilege, int64, int64]
+	roleTeams      enterprise.IEnterpriseLink[enterprise.IRoleTeam, int64, string]
+	teams          enterprise.IEnterpriseEntity[enterprise.ITeam, string]
 }
 
 func NewRoleDataSource() datasource.DataSource {
@@ -61,9 +65,9 @@ func (d *roleDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			Optional:    true,
 			Description: "Role Name",
 		},
-		"include_users": schema.BoolAttribute{
+		"include_members": schema.BoolAttribute{
 			Optional:    true,
-			Description: "Include team users",
+			Description: "Include role members",
 		},
 	}
 	var usersAttribute = map[string]schema.Attribute{
@@ -71,6 +75,14 @@ func (d *roleDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			Computed: true,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: userShortSchemaAttributes,
+			},
+		},
+	}
+	var teamsAttribute = map[string]schema.Attribute{
+		"teams": schema.ListNestedAttribute{
+			Computed: true,
+			NestedObject: schema.NestedAttributeObject{
+				Attributes: teamShortSchemaAttributes,
 			},
 		},
 	}
@@ -84,11 +96,31 @@ func (d *roleDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 	}
 
 	resp.Schema = schema.Schema{
-		Attributes: mergeMaps(filterAttributes, roleSchemaAttributes, usersAttribute, managedNodesAttribute),
+		Attributes: mergeMaps(filterAttributes, roleSchemaAttributes, usersAttribute, teamsAttribute, managedNodesAttribute),
 	}
 }
 
-// Read refreshes the Terraform state with the latest data.
+func (d *roleDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+	if ed, ok := req.ProviderData.(enterprise.IEnterpriseData); ok {
+		d.roles = ed.Roles()
+		d.roleUsers = ed.RoleUsers()
+		d.users = ed.Users()
+		d.managedNodes = ed.ManagedNodes()
+		d.rolePrivileges = ed.RolePrivileges()
+		d.nodes = ed.Nodes()
+		d.roleTeams = ed.RoleTeams()
+		d.teams = ed.Teams()
+	} else {
+		resp.Diagnostics.AddError(
+			"Unexpected Data Source Configure Type",
+			fmt.Sprintf("Expected \"IEnterpriseData\", got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+	}
+}
+
 func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var rq roleDataSourceModel
 	diags := req.Config.Get(ctx, &rq)
@@ -139,6 +171,10 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	d.managedNodes.GetLinksBySubject(role.RoleId(), func(mn enterprise.IManagedNode) bool {
 		var mnm = new(managedNodeModel)
 		mnm.NodeId = types.Int64Value(mn.ManagedNodeId())
+		var node = d.nodes.GetEntity(mn.ManagedNodeId())
+		if node != nil {
+			mnm.Name = types.StringValue(node.Name())
+		}
 		mnm.CascadeNodeManagement = types.BoolValue(mn.CascadeNodeManagement())
 		var privileges = d.rolePrivileges.GetLink(mn.RoleId(), mn.ManagedNodeId())
 		if privileges != nil {
@@ -146,11 +182,12 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 				mnm.Privileges = append(mnm.Privileges, types.StringValue(p))
 			}
 		}
+		rm.ManagedNodes = append(rm.ManagedNodes, mnm)
 		return true
 	})
-	if !rq.IncludeUsers.IsNull() && rq.IncludeUsers.ValueBool() {
-		d.roleUsers.GetLinksBySubject(role.RoleId(), func(u enterprise.IRoleUser) bool {
-			var user = d.users.GetEntity(u.EnterpriseUserId())
+	if !rq.IncludeMembers.IsNull() && rq.IncludeMembers.ValueBool() {
+		d.roleUsers.GetLinksBySubject(role.RoleId(), func(ru enterprise.IRoleUser) bool {
+			var user = d.users.GetEntity(ru.EnterpriseUserId())
 			if user != nil {
 				var usm = new(userShortModel)
 				usm.fromKeeper(user)
@@ -158,27 +195,18 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 			}
 			return true
 		})
+		d.roleTeams.GetLinksBySubject(role.RoleId(), func(rt enterprise.IRoleTeam) bool {
+			var team = d.teams.GetEntity(rt.TeamUid())
+			if team != nil {
+				var tsm = new(teamShortModel)
+				tsm.fromKeeper(team)
+				rm.Teams = append(rm.Teams, tsm)
+			}
+			return true
+		})
 	}
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
-}
-
-func (d *roleDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-	if ed, ok := req.ProviderData.(enterprise.IEnterpriseData); ok {
-		d.roles = ed.Roles()
-		d.roleUsers = ed.RoleUsers()
-		d.users = ed.Users()
-		d.managedNodes = ed.ManagedNodes()
-		d.rolePrivileges = ed.RolePrivileges()
-	} else {
-		resp.Diagnostics.AddError(
-			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected \"IEnterpriseData\", got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
-	}
 }
 
 func (d *roleDataSource) ConfigValidators(ctx context.Context) []datasource.ConfigValidator {

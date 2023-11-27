@@ -162,7 +162,7 @@ func (d *nodesDataSource) Configure(ctx context.Context, req datasource.Configur
 	} else {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected \"IEnterpriseLoader\", got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected \"IEnterpriseData\", got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 	}
 }

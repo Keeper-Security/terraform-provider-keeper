@@ -108,24 +108,45 @@ data "keeper-enterprise_teams" "teams" {  // -> IDs
 #  }
 #}
 
-data "kepr_node" "root" {
-  is_root = true
+#data "kepr_node" "root" {
+#  is_root = true
+#}
+#
+#data "kepr_node" "azure" {
+#  name = "Azure Cloud"
+#  parent_id = data.kepr_node.root.node_id
+#}
+#
+#data "kepr_users" "azure_users" {
+#  nodes = [data.kepr_node.azure.node_id]
+#}
+#resource "kepr_team" "team33" {
+#    name = "Team33"
+#    node_id = data.kepr_node.azure.node_id
+#}
+#
+#resource "kepr_team_membership" "team33" {
+#  team_uid = resource.kepr_team.team33.team_uid
+#  users = data.kepr_users.azure_users.users[*].enterprise_user_id
+#}
+
+#data "kepr_users" "all_users" {
+#}
+
+#data "kepr_role" "admin" {
+#  name = "Keeper Administrator"
+#  include_users = true
+#}
+
+data "kepr_roles" "admins" {
+  filter = {
+    field = "is_admin"
+    cmp = "="
+    value = true
+  }
 }
 
-data "kepr_node" "azure" {
-  name = "Azure Cloud"
-  parent_id = data.kepr_node.root.node_id
-}
-
-resource "kepr_node" "new" {
-  name = "New Node"
-  parent_id = data.kepr_node.azure.node_id
-}
-resource "kepr_team" "team55" {
-    name = "Team55"
-    node_id = resource.kepr_node.new.node_id
-}
 
 output "example" {
-   value = data.kepr_node.azure
+   value = data.kepr_roles.admins
  }
