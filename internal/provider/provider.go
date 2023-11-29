@@ -229,7 +229,7 @@ func (p *keeperEnterpriseProvider) DataSources(ctx context.Context) []func() dat
 	return []func() datasource.DataSource{
 		NewNodeDataSource, NewNodesDataSource,
 		NewTeamDataSource, NewTeamsDataSource,
-		NewRoleDataSource, NewRolesDataSource,
+		NewRoleDataSource, NewRolesDataSource, NewPrivilegeDataSource,
 		NewUserDataSource, NewUsersDataSource,
 	}
 }

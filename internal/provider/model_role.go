@@ -52,10 +52,10 @@ var roleSchemaAttributes = map[string]schema.Attribute{
 }
 
 type managedNodeModel struct {
-	NodeId                types.Int64    `tfsdk:"node_id"`
-	Name                  types.String   `tfsdk:"name"`
-	CascadeNodeManagement types.Bool     `tfsdk:"cascade_node_management"`
-	Privileges            []types.String `tfsdk:"privileges"`
+	NodeId                types.Int64              `tfsdk:"node_id"`
+	Name                  types.String             `tfsdk:"name"`
+	CascadeNodeManagement types.Bool               `tfsdk:"cascade_node_management"`
+	Privileges            privilegeDataSourceModel `tfsdk:"privileges"`
 }
 
 var managedNodeSchemaAttributes = map[string]schema.Attribute{
@@ -71,9 +71,9 @@ var managedNodeSchemaAttributes = map[string]schema.Attribute{
 		Computed:    true,
 		Description: "Cascade Node Management",
 	},
-	"privileges": schema.ListAttribute{
-		Computed:    true,
-		ElementType: types.StringType,
+	"privileges": schema.SingleNestedAttribute{
+		Attributes:  privilegesAttributes,
+		Optional:    true,
 		Description: "Privileges",
 	},
 }
