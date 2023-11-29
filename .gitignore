@@ -49,3 +49,5 @@ website/vendor
 
 # Go workspace file
 go.work
+
+examples/
