@@ -17,16 +17,17 @@ var (
 )
 
 type nodeDataSourceModel struct {
-	NodeId               types.Int64   `tfsdk:"node_id"`
-	Name                 types.String  `tfsdk:"name"`
-	ParentId             types.Int64   `tfsdk:"parent_id"`
-	BridgeId             types.Int64   `tfsdk:"bridge_id"`
-	ScimId               types.Int64   `tfsdk:"scim_id"`
-	DuoEnabled           types.Bool    `tfsdk:"duo_enabled"`
-	RsaEnabled           types.Bool    `tfsdk:"rsa_enabled"`
-	RestrictVisibility   types.Bool    `tfsdk:"restrict_visibility"`
-	SsoServiceProviderId []types.Int64 `tfsdk:"sso_provider_ids"`
-	IsRoot               types.Bool    `tfsdk:"is_root"`
+	NodeId               types.Int64   			`tfsdk:"node_id"`
+	Name                 types.String  			`tfsdk:"name"`
+	ParentId             types.Int64   			`tfsdk:"parent_id"`
+	Bridge				*bridgeShortModel		`tfsdk:"bridge"`
+	Scim				 *scimShortModel		`tfsdk:"scim"`
+	DuoEnabled           types.Bool    			`tfsdk:"duo_enabled"`
+	RsaEnabled           types.Bool    			`tfsdk:"rsa_enabled"`
+	RestrictVisibility   types.Bool    			`tfsdk:"restrict_visibility"`
+	SsoOnPremise		*ssoProviderShortModel	`tfsdk:"sso_provider_on_premise"`
+	SsoInCloud			*ssoProviderShortModel	`tfsdk:"sso_provider_in_cloud"`
+	IsRoot               types.Bool    		`tfsdk:"is_root"`
 }
 
 func (model *nodeDataSourceModel) fromKeeper(node enterprise.INode) {
@@ -37,26 +38,39 @@ func (model *nodeDataSourceModel) fromKeeper(node enterprise.INode) {
 	if node.ParentId() > 0 {
 		model.ParentId = types.Int64Value(node.ParentId())
 	}
-	if node.BridgeId() > 0 {
-		model.BridgeId = types.Int64Value(node.BridgeId())
-	}
-	if node.ScimId() > 0 {
-		model.ScimId = types.Int64Value(node.ScimId())
-	}
 	if node.RestrictVisibility() {
 		model.RestrictVisibility = types.BoolValue(true)
 	}
-	if len(node.SsoServiceProviderId()) > 0 {
-		for _, x := range node.SsoServiceProviderId() {
-			model.SsoServiceProviderId = append(model.SsoServiceProviderId, types.Int64Value(x))
-		}
+}
+
+func (model *nodeDataSourceModel) loadScimData(scim enterprise.IScim) {
+	var sm = new(scimShortModel)
+	sm.fromKeeper(scim)
+	model.Scim = sm
+}
+
+func (model *nodeDataSourceModel) loadBridgeData(bridge enterprise.IBridge) {
+	var bm = new(bridgeShortModel)
+	bm.fromKeeper(bridge)
+	model.Bridge = bm
+}
+
+func (model *nodeDataSourceModel) loadSsoServiceData(service enterprise.ISsoService) {
+	var sm = new(ssoProviderShortModel)
+	sm.fromKeeper(service)
+	if service.IsCloud() {
+		model.SsoOnPremise = sm
+	} else {
+		model.SsoInCloud = sm
 	}
 }
 
 type nodeDataSource struct {
-	rootNode enterprise.INode
-	nodes    enterprise.IEnterpriseEntity[enterprise.INode, int64]
-	bridges  enterprise.IEnterpriseEntity[enterprise.IBridge, int64]
+	rootNode 		enterprise.INode
+	nodes    		enterprise.IEnterpriseEntity[enterprise.INode, int64]
+	bridges  		enterprise.IEnterpriseEntity[enterprise.IBridge, int64]
+	scims			enterprise.IEnterpriseEntity[enterprise.IScim, int64]
+	ssoProviders	enterprise.IEnterpriseEntity[enterprise.ISsoService, int64]
 }
 
 func NewNodeDataSource() datasource.DataSource {
@@ -87,7 +101,7 @@ func (d *nodeDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 		},
 	}
 	resp.Schema = schema.Schema{
-		Attributes: mergeMaps(filterAttributes, nodeSchemaAttributes),
+		Attributes: mergeMaps(filterAttributes, nodeDetailedSchemaAttributes),
 	}
 }
 
@@ -142,9 +156,36 @@ func (d *nodeDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
+
 	var state = nq
 	var nm = &state
 	nm.fromKeeper(node)
+
+	var scimId = node.ScimId()
+	if scimId > 0 {
+		var scim = d.scims.GetEntity(scimId)
+		if scim != nil {
+			nm.loadScimData(scim)
+		}
+	}
+
+	var bridgeId = node.BridgeId()
+	if bridgeId > 0 {
+		var bridge = d.bridges.GetEntity(bridgeId)
+		if bridge != nil {
+			nm.loadBridgeData(bridge)
+		}
+	}
+
+	if len(node.SsoServiceProviderId()) > 0 {
+		for _, x := range node.SsoServiceProviderId() {
+			var service = d.ssoProviders.GetEntity(x)
+			if service != nil {
+				nm.loadSsoServiceData(service)
+			}
+		}
+	}
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }
@@ -157,6 +198,8 @@ func (d *nodeDataSource) Configure(ctx context.Context, req datasource.Configure
 		d.nodes = ed.Nodes()
 		d.bridges = ed.Bridges()
 		d.rootNode = ed.GetRootNode()
+		d.scims = ed.Scims()
+		d.ssoProviders = ed.SsoServices()
 	} else {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
