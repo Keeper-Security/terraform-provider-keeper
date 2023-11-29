@@ -80,3 +80,50 @@ var nodeSchemaAttributes = map[string]schema.Attribute{
 		ElementType: types.Int64Type,
 	},
 }
+
+var nodeDetailedSchemaAttributes = map[string]schema.Attribute{
+	"node_id": schema.Int64Attribute{
+		Computed:    true,
+		Description: "Node ID",
+	},
+	"name": schema.StringAttribute{
+		Computed:    true,
+		Description: "Node Name",
+	},
+	"parent_id": schema.Int64Attribute{
+		Computed:    true,
+		Description: "Parent Node ID",
+	},
+	"bridge": schema.SingleNestedAttribute{
+		Attributes: bridgeShortSchemaAttributes,
+		Computed:    true,
+		Description: "Bridge",
+	},
+	"scim": schema.SingleNestedAttribute{
+		Attributes: scimShortSchemaAttributes,
+		Computed:    true,
+		Description: "SCIM",
+	},
+	"duo_enabled": schema.BoolAttribute{
+		Computed:    true,
+		Description: "DUO Enabled",
+	},
+	"rsa_enabled": schema.BoolAttribute{
+		Computed:    true,
+		Description: "RSA Configured",
+	},
+	"restrict_visibility": schema.BoolAttribute{
+		Computed:    true,
+		Description: "Restrict Node Visibility",
+	},
+	"sso_provider_on_premise": schema.SingleNestedAttribute{
+		Attributes:		ssoProviderShortSchemaAttributes,
+		Computed:		true,
+		Description: 	"On-premise SSO Service Provider",
+	},
+	"sso_provider_in_cloud": schema.SingleNestedAttribute{
+		Attributes:		ssoProviderShortSchemaAttributes,
+		Computed:		true,
+		Description: 	"Cloud-based SSO Service Provider",
+	},
+}
