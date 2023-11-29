@@ -85,20 +85,22 @@ func (tmr *teamMembershipResource) Read(ctx context.Context, req resource.ReadRe
 		)
 		return
 	}
-	var users []attr.Value
+
+	var members []attr.Value
 	tmr.management.EnterpriseData().TeamUsers().GetLinksBySubject(teamUid, func(tu enterprise.ITeamUser) bool {
-		users = append(users, types.Int64Value(tu.EnterpriseUserId()))
+		members = append(members, types.Int64Value(tu.EnterpriseUserId()))
 		return true
 	})
 	state.TeamUid = types.StringValue(teamUid)
-	state.Users, diags = types.SetValue(types.Int64Type, users)
+	state.Users, diags = types.SetValue(types.Int64Type, members)
+
 	if resp.Diagnostics.Append(diags...); resp.Diagnostics.HasError() {
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func (tmr *teamMembershipResource) applyMembership(ctx context.Context, plan teamMembershipResourceModel) (diags diag.Diagnostics) {
+func (tmr *teamMembershipResource) applyMembership(plan teamMembershipResourceModel) (diags diag.Diagnostics) {
 	var teams = tmr.management.EnterpriseData().Teams()
 	var teamUid = plan.TeamUid.ValueString()
 	var team = teams.GetEntity(teamUid)
@@ -159,7 +161,7 @@ func (tmr *teamMembershipResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
-	resp.Diagnostics.Append(tmr.applyMembership(ctx, plan)...)
+	resp.Diagnostics.Append(tmr.applyMembership(plan)...)
 	if !resp.Diagnostics.HasError() {
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 	}
@@ -172,7 +174,7 @@ func (tmr *teamMembershipResource) Update(ctx context.Context, req resource.Upda
 		return
 	}
 
-	resp.Diagnostics.Append(tmr.applyMembership(ctx, plan)...)
+	resp.Diagnostics.Append(tmr.applyMembership(plan)...)
 	if !resp.Diagnostics.HasError() {
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 	}
@@ -186,7 +188,7 @@ func (tmr *teamMembershipResource) Delete(ctx context.Context, req resource.Dele
 
 	var plan teamMembershipResourceModel
 	plan.TeamUid = state.TeamUid
-	resp.Diagnostics.Append(tmr.applyMembership(ctx, plan)...)
+	resp.Diagnostics.Append(tmr.applyMembership(plan)...)
 	if !resp.Diagnostics.HasError() {
 		resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 	}
