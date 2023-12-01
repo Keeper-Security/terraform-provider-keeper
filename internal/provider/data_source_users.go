@@ -12,6 +12,7 @@ import (
 	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
 	"reflect"
 	"strings"
+	"terraform-provider-kepr/internal/model"
 )
 
 var (
@@ -19,11 +20,11 @@ var (
 )
 
 type usersDataSourceModel struct {
-	IsActive types.Bool      `tfsdk:"is_active"`
-	Filter   *filterCriteria `tfsdk:"filter"`
-	Emails   types.Set       `tfsdk:"emails"`
-	Nodes    types.Set       `tfsdk:"nodes"`
-	Users    []*userModel    `tfsdk:"users"`
+	IsActive types.Bool            `tfsdk:"is_active"`
+	Filter   *model.FilterCriteria `tfsdk:"filter"`
+	Emails   types.Set             `tfsdk:"emails"`
+	Nodes    types.Set             `tfsdk:"nodes"`
+	Users    []*userModel          `tfsdk:"users"`
 }
 
 type usersDataSource struct {
@@ -55,7 +56,7 @@ func (d *usersDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 				ElementType: types.Int64Type,
 			},
 			"filter": schema.SingleNestedAttribute{
-				Attributes:  filterCriteriaAttributes,
+				Attributes:  model.FilterCriteriaAttributes,
 				Optional:    true,
 				Description: "Search By field filter",
 			},
@@ -107,10 +108,10 @@ func (d *usersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		}
 	}
 
-	var cb matcher
+	var cb model.Matcher
 	var diags diag.Diagnostics
 	if uq.Filter != nil {
-		cb, diags = getFieldMatcher(uq.Filter, reflect.TypeOf((*userModel)(nil)))
+		cb, diags = model.GetFieldMatcher(uq.Filter, reflect.TypeOf((*userModel)(nil)))
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return

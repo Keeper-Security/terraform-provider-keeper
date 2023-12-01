@@ -4,6 +4,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
+	"terraform-provider-kepr/internal/model"
 )
 
 type roleModel struct {
@@ -52,10 +53,10 @@ var roleSchemaAttributes = map[string]schema.Attribute{
 }
 
 type managedNodeModel struct {
-	NodeId                types.Int64              `tfsdk:"node_id"`
-	Name                  types.String             `tfsdk:"name"`
-	CascadeNodeManagement types.Bool               `tfsdk:"cascade_node_management"`
-	Privileges            privilegeDataSourceModel `tfsdk:"privileges"`
+	NodeId                types.Int64                    `tfsdk:"node_id"`
+	Name                  types.String                   `tfsdk:"name"`
+	CascadeNodeManagement types.Bool                     `tfsdk:"cascade_node_management"`
+	Privileges            model.PrivilegeDataSourceModel `tfsdk:"privileges"`
 }
 
 var managedNodeSchemaAttributes = map[string]schema.Attribute{

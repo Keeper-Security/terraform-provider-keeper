@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
 	"strings"
+	"terraform-provider-kepr/internal/model"
 )
 
 var (
@@ -17,17 +18,17 @@ var (
 )
 
 type nodeDataSourceModel struct {
-	NodeId               types.Int64   			`tfsdk:"node_id"`
-	Name                 types.String  			`tfsdk:"name"`
-	ParentId             types.Int64   			`tfsdk:"parent_id"`
-	Bridge				*bridgeShortModel		`tfsdk:"bridge"`
-	Scim				 *scimShortModel		`tfsdk:"scim"`
-	DuoEnabled           types.Bool    			`tfsdk:"duo_enabled"`
-	RsaEnabled           types.Bool    			`tfsdk:"rsa_enabled"`
-	RestrictVisibility   types.Bool    			`tfsdk:"restrict_visibility"`
-	SsoOnPremise		*ssoProviderShortModel	`tfsdk:"sso_provider_on_premise"`
-	SsoInCloud			*ssoProviderShortModel	`tfsdk:"sso_provider_in_cloud"`
-	IsRoot               types.Bool    		`tfsdk:"is_root"`
+	NodeId             types.Int64            `tfsdk:"node_id"`
+	Name               types.String           `tfsdk:"name"`
+	ParentId           types.Int64            `tfsdk:"parent_id"`
+	Bridge             *bridgeShortModel      `tfsdk:"bridge"`
+	Scim               *scimShortModel        `tfsdk:"scim"`
+	DuoEnabled         types.Bool             `tfsdk:"duo_enabled"`
+	RsaEnabled         types.Bool             `tfsdk:"rsa_enabled"`
+	RestrictVisibility types.Bool             `tfsdk:"restrict_visibility"`
+	SsoOnPremise       *ssoProviderShortModel `tfsdk:"sso_provider_on_premise"`
+	SsoInCloud         *ssoProviderShortModel `tfsdk:"sso_provider_in_cloud"`
+	IsRoot             types.Bool             `tfsdk:"is_root"`
 }
 
 func (model *nodeDataSourceModel) fromKeeper(node enterprise.INode) {
@@ -66,11 +67,11 @@ func (model *nodeDataSourceModel) loadSsoServiceData(service enterprise.ISsoServ
 }
 
 type nodeDataSource struct {
-	rootNode 		enterprise.INode
-	nodes    		enterprise.IEnterpriseEntity[enterprise.INode, int64]
-	bridges  		enterprise.IEnterpriseEntity[enterprise.IBridge, int64]
-	scims			enterprise.IEnterpriseEntity[enterprise.IScim, int64]
-	ssoProviders	enterprise.IEnterpriseEntity[enterprise.ISsoService, int64]
+	rootNode     enterprise.INode
+	nodes        enterprise.IEnterpriseEntity[enterprise.INode, int64]
+	bridges      enterprise.IEnterpriseEntity[enterprise.IBridge, int64]
+	scims        enterprise.IEnterpriseEntity[enterprise.IScim, int64]
+	ssoProviders enterprise.IEnterpriseEntity[enterprise.ISsoService, int64]
 }
 
 func NewNodeDataSource() datasource.DataSource {
@@ -101,7 +102,7 @@ func (d *nodeDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 		},
 	}
 	resp.Schema = schema.Schema{
-		Attributes: mergeMaps(filterAttributes, nodeDetailedSchemaAttributes),
+		Attributes: model.MergeMaps(filterAttributes, nodeDetailedSchemaAttributes),
 	}
 }
 
@@ -156,7 +157,6 @@ func (d *nodeDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-
 	var state = nq
 	var nm = &state
 	nm.fromKeeper(node)
@@ -197,7 +197,7 @@ func (d *nodeDataSource) Configure(ctx context.Context, req datasource.Configure
 	if ed, ok := req.ProviderData.(enterprise.IEnterpriseData); ok {
 		d.nodes = ed.Nodes()
 		d.bridges = ed.Bridges()
-		d.rootNode = ed.GetRootNode()
+		d.rootNode = ed.RootNode()
 		d.scims = ed.Scims()
 		d.ssoProviders = ed.SsoServices()
 	} else {

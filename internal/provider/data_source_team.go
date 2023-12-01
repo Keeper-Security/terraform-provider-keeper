@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
 	"strings"
+	"terraform-provider-kepr/internal/model"
 )
 
 var (
@@ -87,7 +88,7 @@ func (d *teamDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 		},
 	}
 	resp.Schema = schema.Schema{
-		Attributes: mergeMaps(filterAttributes, teamSchemaAttributes, usersAttribute, rolesAttribute),
+		Attributes: model.MergeMaps(filterAttributes, teamSchemaAttributes, usersAttribute, rolesAttribute),
 	}
 }
 

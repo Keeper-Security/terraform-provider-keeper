@@ -1,4 +1,4 @@
-package provider
+package model
 
 import (
 	"fmt"
@@ -13,12 +13,12 @@ import (
 	"strings"
 )
 
-type nodeCriteria struct {
+type NodeCriteria struct {
 	NodeId  types.Int64 `tfsdk:"node_id"`
 	Cascade types.Bool  `tfsdk:"cascade"`
 }
 
-var nodeCriteriaAttributes = map[string]schema.Attribute{
+var NodeCriteriaAttributes = map[string]schema.Attribute{
 	"node_id": schema.Int64Attribute{
 		Required:    true,
 		Description: "Base Node ID",
@@ -29,9 +29,9 @@ var nodeCriteriaAttributes = map[string]schema.Attribute{
 	},
 }
 
-type nodeMatcher = func(int64) bool
+type NodeMatcher = func(int64) bool
 
-func getNodeMatcher(nc *nodeCriteria, nodes enterprise.IEnterpriseEntity[enterprise.INode, int64]) (mf nodeMatcher, diags diag.Diagnostics) {
+func GetNodeMatcher(nc *NodeCriteria, nodes enterprise.IEnterpriseEntity[enterprise.INode, int64]) (mf NodeMatcher, diags diag.Diagnostics) {
 	if nc != nil {
 		var rootNodeId = nc.NodeId.ValueInt64()
 		var n = nodes.GetEntity(rootNodeId)
@@ -81,13 +81,13 @@ func getNodeMatcher(nc *nodeCriteria, nodes enterprise.IEnterpriseEntity[enterpr
 	return
 }
 
-type filterCriteria struct {
+type FilterCriteria struct {
 	Field types.String `tfsdk:"field"`
 	Cmp   types.String `tfsdk:"cmp"`
 	Value types.String `tfsdk:"value"`
 }
 
-var filterCriteriaAttributes = map[string]schema.Attribute{
+var FilterCriteriaAttributes = map[string]schema.Attribute{
 	"field": schema.StringAttribute{
 		Required:    true,
 		Description: "Field Name",
@@ -147,9 +147,9 @@ var (
 	}
 )
 
-type matcher = func(interface{}) bool
+type Matcher = func(interface{}) bool
 
-func getStrMatcher(field reflect.StructField, structType reflect.Type, strValue *string, op StrOp) func(interface{}) bool {
+func getStrMatcher(field reflect.StructField, structType reflect.Type, strValue *string, op StrOp) Matcher {
 	return func(obj interface{}) bool {
 		var vObj = reflect.ValueOf(obj)
 		if vObj.Type().Kind() == reflect.Pointer {
@@ -372,7 +372,7 @@ const (
 	matcherType_Bool
 )
 
-func getFieldMatcher(fc *filterCriteria, modelType reflect.Type) (cb matcher, diags diag.Diagnostics) {
+func GetFieldMatcher(fc *FilterCriteria, modelType reflect.Type) (cb Matcher, diags diag.Diagnostics) {
 	if fc == nil {
 		return
 	}

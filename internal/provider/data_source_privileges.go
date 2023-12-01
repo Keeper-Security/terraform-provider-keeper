@@ -5,44 +5,76 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/api"
-	"strings"
+	"terraform-provider-kepr/internal/model"
 )
 
 var (
 	_ datasource.DataSource = &privilegeDataSource{}
 )
 
-type privilegeDataSourceModel struct {
-	ManageNodes          types.Bool `tfsdk:"manage_nodes"`
-	ManageUsers          types.Bool `tfsdk:"manage_users"`
-	ManageRoles          types.Bool `tfsdk:"manage_roles"`
-	ManageTeams          types.Bool `tfsdk:"manage_teams"`
-	ManageReports        types.Bool `tfsdk:"manage_reports"`
-	ManageSso            types.Bool `tfsdk:"manage_sso"`
-	DeviceApproval       types.Bool `tfsdk:"device_approval"`
-	ManageRecordTypes    types.Bool `tfsdk:"manage_record_types"`
-	ShareAdmin           types.Bool `tfsdk:"share_admin"`
-	RunComplianceReports types.Bool `tfsdk:"run_compliance_reports"`
-	TransferAccount      types.Bool `tfsdk:"transfer_account"`
-	ManageCompanies      types.Bool `tfsdk:"manage_companies"`
-}
-
-func (model *privilegeDataSourceModel) fromKeeper(privileges []string) {
-	var s = api.NewSet[string]()
-	s.Union(api.SliceSelect(privileges, func(x string) string { return strings.ToLower(x) }))
-	model.ManageNodes = types.BoolValue(s.Has("manage_nodes"))
-	model.ManageUsers = types.BoolValue(s.Has("manage_user"))
-	model.ManageRoles = types.BoolValue(s.Has("manage_roles"))
-	model.ManageTeams = types.BoolValue(s.Has("manage_teams"))
-	model.ManageReports = types.BoolValue(s.Has("run_reports"))
-	model.ManageSso = types.BoolValue(s.Has("manage_bridge"))
-	model.DeviceApproval = types.BoolValue(s.Has("approve_device"))
-	model.ManageRecordTypes = types.BoolValue(s.Has("manage_record_types"))
-	model.ShareAdmin = types.BoolValue(s.Has("sharing_administrator"))
-	model.RunComplianceReports = types.BoolValue(s.Has("run_compliance_reports"))
-	model.TransferAccount = types.BoolValue(s.Has("transfer_account"))
-	model.ManageCompanies = types.BoolValue(s.Has("manage_companies"))
+var privilegesAttributes = map[string]schema.Attribute{
+	"manage_nodes": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Manage Nodes",
+	},
+	"manage_users": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Manage Users",
+	},
+	"manage_teams": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Manage Teams",
+	},
+	"manage_roles": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Manage Roles",
+	},
+	"manage_reports": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Manage Reporting and Alerts",
+	},
+	"manage_sso": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Manage Bridge/SSO",
+	},
+	"device_approval": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Perform Device Approvals",
+	},
+	"manage_record_types": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Manage Record Types in Vault",
+		MarkdownDescription: "This permission allows the admin rights to create, edit, or delete Record Types " +
+			"which have pre-defined fields. Record Types appear during creation of records in the user's vault.",
+	},
+	"share_admin": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Share Admin",
+	},
+	"run_compliance_reports": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Run Compliance Reports",
+	},
+	"transfer_account": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Transfer Account",
+	},
+	"manage_companies": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Manage Companies",
+	},
 }
 
 type privilegeDataSource struct {
@@ -66,7 +98,7 @@ func (d *privilegeDataSource) Configure(ctx context.Context, req datasource.Conf
 }
 
 func (d *privilegeDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var rq privilegeDataSourceModel
+	var rq model.PrivilegeDataSourceModel
 	diags := req.Config.Get(ctx, &rq)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
