@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
 	"strings"
+	"terraform-provider-kepr/internal/model"
 )
 
 func newNodeResource() resource.Resource {
@@ -77,7 +78,7 @@ func (nr *nodeResource) Metadata(_ context.Context, req resource.MetadataRequest
 
 func (nr *nodeResource) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Attributes: mergeMaps(nodeResourceSchemaAttributes),
+		Attributes: model.MergeMaps(nodeResourceSchemaAttributes),
 	}
 }
 
@@ -110,7 +111,7 @@ func (nr *nodeResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	}
 
 	if state.ParentId.IsNull() || state.ParentId.ValueInt64() == 0 {
-		state.ParentId = types.Int64Value(nr.management.EnterpriseData().GetRootNode().NodeId())
+		state.ParentId = types.Int64Value(nr.management.EnterpriseData().RootNode().NodeId())
 	}
 
 	var nodes = nr.management.EnterpriseData().Nodes()
@@ -153,7 +154,7 @@ func (nr *nodeResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		plan.ParentId = state.NodeId
 	}
 	if plan.ParentId.IsNull() || plan.ParentId.ValueInt64() == 0 {
-		plan.ParentId = types.Int64Value(nr.management.EnterpriseData().GetRootNode().NodeId())
+		plan.ParentId = types.Int64Value(nr.management.EnterpriseData().RootNode().NodeId())
 	}
 	if plan.NodeId.IsNull() {
 		plan.NodeId = state.NodeId
@@ -199,7 +200,7 @@ func (nr *nodeResource) Create(ctx context.Context, req resource.CreateRequest, 
 		return
 	}
 	if plan.ParentId.IsNull() || plan.ParentId.ValueInt64() == 0 {
-		plan.ParentId = types.Int64Value(nr.management.EnterpriseData().GetRootNode().NodeId())
+		plan.ParentId = types.Int64Value(nr.management.EnterpriseData().RootNode().NodeId())
 	}
 	var parentId = plan.ParentId.ValueInt64()
 	var node enterprise.INode

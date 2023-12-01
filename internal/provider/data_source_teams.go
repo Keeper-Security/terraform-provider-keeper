@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
 	"reflect"
+	"terraform-provider-kepr/internal/model"
 )
 
 var (
@@ -16,9 +17,9 @@ var (
 )
 
 type teamsDataSourceModel struct {
-	FilterCriteria *filterCriteria `tfsdk:"filter"`
-	NodeCriteria   *nodeCriteria   `tfsdk:"nodes"`
-	Teams          []*teamModel    `tfsdk:"teams"`
+	FilterCriteria *model.FilterCriteria `tfsdk:"filter"`
+	NodeCriteria   *model.NodeCriteria   `tfsdk:"nodes"`
+	Teams          []*teamModel          `tfsdk:"teams"`
 }
 
 type teamsDataSource struct {
@@ -39,12 +40,12 @@ func (d *teamsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"filter": schema.SingleNestedAttribute{
-				Attributes:  filterCriteriaAttributes,
+				Attributes:  model.FilterCriteriaAttributes,
 				Optional:    true,
 				Description: "Search By field filter",
 			},
 			"nodes": schema.SingleNestedAttribute{
-				Attributes:  nodeCriteriaAttributes,
+				Attributes:  model.NodeCriteriaAttributes,
 				Optional:    true,
 				Description: "Search By node filter",
 			},
@@ -66,15 +67,15 @@ func (d *teamsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		return
 	}
 
-	var nm nodeMatcher
-	nm, diags = getNodeMatcher(tq.NodeCriteria, d.nodes)
+	var nm model.NodeMatcher
+	nm, diags = model.GetNodeMatcher(tq.NodeCriteria, d.nodes)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var fm matcher
-	fm, diags = getFieldMatcher(tq.FilterCriteria, reflect.TypeOf((*teamModel)(nil)))
+	var fm model.Matcher
+	fm, diags = model.GetFieldMatcher(tq.FilterCriteria, reflect.TypeOf((*teamModel)(nil)))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

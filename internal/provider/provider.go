@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package provider
 
 import (
@@ -21,6 +18,8 @@ import (
 	"go.uber.org/zap/zapcore"
 	"os"
 	"strings"
+	"terraform-provider-kepr/internal/model"
+	"terraform-provider-kepr/internal/test"
 )
 
 // Ensure KeeperEnterpriseProvider satisfies various provider interfaces.
@@ -31,7 +30,8 @@ type keeperEnterpriseProvider struct {
 	// version is set to the provider version on release, "dev" when the
 	// provider is built and ran locally, and "test" when running acceptance
 	// testing.
-	version string
+	version    string
+	management enterprise.IEnterpriseManagement
 }
 
 func New(version string) func() provider.Provider {
@@ -88,134 +88,140 @@ func (p *keeperEnterpriseProvider) ValidateConfig(ctx context.Context, req provi
 }
 
 func (p *keeperEnterpriseProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-
 	var config keeperEnterpriseProviderModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if config.ConfigurationPath.IsUnknown() {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("config_path"),
-			"Unknown Attribute Value",
-			"The provider uses configuration file to connect to the Keeper backend.",
-		)
-	}
-	if config.ConfigurationType.IsUnknown() {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("config_type"),
-			"Unknown Attribute Value",
-			"The provider uses configuration file to connect to the Keeper backend.",
-		)
-	}
-
-	var core = zapcore.RegisterHooks(NewNopCore(), func(entry zapcore.Entry) error {
-		switch entry.Level {
-		case zapcore.DebugLevel:
-			tflog.Debug(ctx, entry.Message)
-		case zapcore.InfoLevel:
-			tflog.Info(ctx, entry.Message)
-		case zapcore.WarnLevel:
-			tflog.Warn(ctx, entry.Message)
-		case zapcore.ErrorLevel:
-			tflog.Error(ctx, entry.Message)
-		}
-		return nil
-	})
-
-	var logger = zap.New(core)
-	api.SetLogger(logger)
-	var configFilename string
-	if config.ConfigurationPath.IsNull() {
-		configFilename = "config.json"
-	} else {
-		configFilename = config.ConfigurationPath.ValueString()
-	}
-	configFilename = api.GetKeeperFileFullPath(configFilename)
-	tflog.Info(ctx, "Configuring file path: "+configFilename)
-	var err error
-	if _, err = os.Stat(configFilename); err != nil {
-		return
-	}
-	var isCommanderConfig = false
-	if !config.ConfigurationType.IsNull() {
-		var configType = config.ConfigurationType.ValueString()
-		isCommanderConfig = strings.EqualFold(configType, "commander")
-	}
-	var configStorage auth.IConfigurationStorage
-	if isCommanderConfig {
-		configStorage = helpers.NewCommanderConfiguration(configFilename)
-	} else {
-		configStorage = helpers.NewJsonConfigurationFile(configFilename)
-	}
-	var keeperConfig auth.IKeeperConfiguration
-	if keeperConfig, err = configStorage.Get(); err != nil {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("config_path"),
-			"Keeper configuration file does not exist",
-			"The provider requires configuration file to connect to the Keeper backend.",
-		)
-	}
-	var keeperEndpoint = helpers.NewKeeperEndpoint(keeperConfig.LastServer(), configStorage)
-	var loginAuth = helpers.NewLoginAuth(keeperEndpoint)
-	loginAuth.Login(keeperConfig.LastLogin())
-	var step = loginAuth.Step()
-	if step.LoginState() != auth.LoginState_Connected {
-		var stepInfo string
-		switch step.LoginState() {
-		case auth.LoginState_TwoFactor:
-			stepInfo = "Requires 2FA"
-		case auth.LoginState_DeviceApproval:
-			stepInfo = "Requires Device Approval"
-		case auth.LoginState_Password:
-			stepInfo = "Requires Password"
-		case auth.LoginState_Error:
-			if es, ok := step.(auth.IErrorStep); ok {
-				stepInfo = fmt.Sprintf("Error: %s", es.Error().Error())
-			} else {
-				stepInfo = "Error"
+	if p.management == nil {
+		var core = zapcore.RegisterHooks(model.NewNopCore(), func(entry zapcore.Entry) error {
+			switch entry.Level {
+			case zapcore.DebugLevel:
+				tflog.Debug(ctx, entry.Message)
+			case zapcore.InfoLevel:
+				tflog.Info(ctx, entry.Message)
+			case zapcore.WarnLevel:
+				tflog.Warn(ctx, entry.Message)
+			case zapcore.ErrorLevel:
+				tflog.Error(ctx, entry.Message)
 			}
-		default:
-			stepInfo = "SSO is not supported"
-		}
-		resp.Diagnostics.AddError(
-			"Cannot connect to Keeper in unattended mode",
-			"The provider requires configuration file to be prepared for unattended login mode.\n"+
-				"It requires either Persistent Login or storing the user password into the configuration file.\n"+
-				"Login Step: "+stepInfo,
-		)
-		return
-	}
-	var ok bool
-	var connectedStep auth.IConnectedStep
-	if connectedStep, ok = step.(auth.IConnectedStep); !ok {
-		resp.Diagnostics.AddError(
-			"Cannot connect to Keeper in unattended mode",
-			"Keeper SDK library error.",
-		)
-		return
-	}
-	var keeperAuth auth.IKeeperAuth
-	if keeperAuth, err = connectedStep.TakeKeeperAuth(); err != nil {
-		resp.Diagnostics.AddError(
-			"Cannot connect to Keeper in unattended mode",
-			err.Error(),
-		)
-		return
-	}
-	var loader = enterprise.NewEnterpriseLoader(keeperAuth, nil)
-	if err = loader.Load(); err != nil {
-		resp.Diagnostics.AddError(
-			"Cannot load Keeper enterprise information",
-			err.Error(),
-		)
-		return
-	}
+			return nil
+		})
 
-	var management = enterprise.NewSyncEnterpriseManagement(loader)
-	resp.DataSourceData = loader.EnterpriseData()
-	resp.ResourceData = management
+		var logger = zap.New(core)
+		api.SetLogger(logger)
+
+		if p.version == "test" {
+			p.management = test.NewloopbackManagement()
+		} else {
+			if config.ConfigurationPath.IsUnknown() {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("config_path"),
+					"Unknown Attribute Value",
+					"The provider uses configuration file to connect to the Keeper backend.",
+				)
+			}
+			if config.ConfigurationType.IsUnknown() {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("config_type"),
+					"Unknown Attribute Value",
+					"The provider uses configuration file to connect to the Keeper backend.",
+				)
+			}
+
+			var configFilename string
+			if config.ConfigurationPath.IsNull() {
+				configFilename = "config.json"
+			} else {
+				configFilename = config.ConfigurationPath.ValueString()
+			}
+			configFilename = api.GetKeeperFileFullPath(configFilename)
+			tflog.Info(ctx, "Configuring file path: "+configFilename)
+			var err error
+			if _, err = os.Stat(configFilename); err != nil {
+				return
+			}
+			var isCommanderConfig = false
+			if !config.ConfigurationType.IsNull() {
+				var configType = config.ConfigurationType.ValueString()
+				isCommanderConfig = strings.EqualFold(configType, "commander")
+			}
+			var configStorage auth.IConfigurationStorage
+			if isCommanderConfig {
+				configStorage = helpers.NewCommanderConfiguration(configFilename)
+			} else {
+				configStorage = helpers.NewJsonConfigurationFile(configFilename)
+			}
+			var keeperConfig auth.IKeeperConfiguration
+			if keeperConfig, err = configStorage.Get(); err != nil {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("config_path"),
+					"Keeper configuration file does not exist",
+					"The provider requires configuration file to connect to the Keeper backend.",
+				)
+			}
+			var keeperEndpoint = helpers.NewKeeperEndpoint(keeperConfig.LastServer(), configStorage)
+			var loginAuth = helpers.NewLoginAuth(keeperEndpoint)
+			loginAuth.Login(keeperConfig.LastLogin())
+			var step = loginAuth.Step()
+			if step.LoginState() != auth.LoginState_Connected {
+				var stepInfo string
+				switch step.LoginState() {
+				case auth.LoginState_TwoFactor:
+					stepInfo = "Requires 2FA"
+				case auth.LoginState_DeviceApproval:
+					stepInfo = "Requires Device Approval"
+				case auth.LoginState_Password:
+					stepInfo = "Requires Password"
+				case auth.LoginState_Error:
+					if es, ok := step.(auth.IErrorStep); ok {
+						stepInfo = fmt.Sprintf("Error: %s", es.Error().Error())
+					} else {
+						stepInfo = "Error"
+					}
+				default:
+					stepInfo = "SSO is not supported"
+				}
+				resp.Diagnostics.AddError(
+					"Cannot connect to Keeper in unattended mode",
+					"The provider requires configuration file to be prepared for unattended login mode.\n"+
+						"It requires either Persistent Login or storing the user password into the configuration file.\n"+
+						"Login Step: "+stepInfo,
+				)
+				return
+			}
+			var ok bool
+			var connectedStep auth.IConnectedStep
+			if connectedStep, ok = step.(auth.IConnectedStep); !ok {
+				resp.Diagnostics.AddError(
+					"Cannot connect to Keeper in unattended mode",
+					"Keeper SDK library error.",
+				)
+				return
+			}
+			var keeperAuth auth.IKeeperAuth
+			if keeperAuth, err = connectedStep.TakeKeeperAuth(); err != nil {
+				resp.Diagnostics.AddError(
+					"Cannot connect to Keeper in unattended mode",
+					err.Error(),
+				)
+				return
+			}
+			var loader = enterprise.NewEnterpriseLoader(keeperAuth, nil)
+			if err = loader.Load(); err != nil {
+				resp.Diagnostics.AddError(
+					"Cannot load Keeper enterprise information",
+					err.Error(),
+				)
+				return
+			}
+
+			p.management = enterprise.NewSyncEnterpriseManagement(loader)
+		}
+	}
+	resp.DataSourceData = p.management.EnterpriseData()
+	resp.ResourceData = p.management
 }
 
 func (p *keeperEnterpriseProvider) Resources(ctx context.Context) []func() resource.Resource {

@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
 	"reflect"
+	"terraform-provider-kepr/internal/model"
 )
 
 var (
@@ -24,9 +25,9 @@ type subNodesCriteria struct {
 }
 
 type nodesDataSourceModel struct {
-	Filter          *filterCriteria   `tfsdk:"filter"`
-	SubNodeCriteria *subNodesCriteria `tfsdk:"subnodes"`
-	Nodes           []*nodeModel      `tfsdk:"nodes"`
+	Filter          *model.FilterCriteria `tfsdk:"filter"`
+	SubNodeCriteria *subNodesCriteria     `tfsdk:"subnodes"`
+	Nodes           []*nodeModel          `tfsdk:"nodes"`
 }
 
 type nodesDataSource struct {
@@ -62,7 +63,7 @@ func (d *nodesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 				Description: "Load subnode tree",
 			},
 			"filter": schema.SingleNestedAttribute{
-				Attributes:  filterCriteriaAttributes,
+				Attributes:  model.FilterCriteriaAttributes,
 				Optional:    true,
 				Description: "Search By field filter",
 			},
@@ -133,8 +134,8 @@ func (d *nodesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			state.Nodes = append(state.Nodes, nm)
 		}
 	} else if nq.Filter != nil {
-		var cb matcher
-		cb, diags = getFieldMatcher(nq.Filter, reflect.TypeOf((*nodeModel)(nil)))
+		var cb model.Matcher
+		cb, diags = model.GetFieldMatcher(nq.Filter, reflect.TypeOf((*nodeModel)(nil)))
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return

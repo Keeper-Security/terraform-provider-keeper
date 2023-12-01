@@ -1,11 +1,11 @@
-package provider
+package model
 
 import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-func mergeMaps[K comparable, V any](maps ...map[K]V) (m map[K]V) {
+func MergeMaps[K comparable, V any](maps ...map[K]V) (m map[K]V) {
 	m = make(map[K]V)
 	var ok bool
 	for _, mm := range maps {

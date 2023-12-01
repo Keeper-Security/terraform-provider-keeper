@@ -1,4 +1,4 @@
-package provider
+package model
 
 import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -31,13 +31,13 @@ func TestIntNullMatcher(t *testing.T) {
 
 	var nt = reflect.TypeOf(wm)
 	var fields = []string{"f3"}
-	var fc = &filterCriteria{
+	var fc = &FilterCriteria{
 		Field: types.StringValue(""),
 		Value: types.StringValue("null"),
 	}
 	for _, f := range fields {
 		fc.Field = types.StringValue(f)
-		cb, diags := getFieldMatcher(fc, nt)
+		cb, diags := GetFieldMatcher(fc, nt)
 		assert.Assert(t, len(diags) == 0)
 		assert.Assert(t, cb != nil)
 		res := cb(wm)
@@ -56,13 +56,13 @@ func TestBoolMatcher(t *testing.T) {
 
 	var nt = reflect.TypeOf(wm)
 	var fields = []string{"f1", "f2", "f3"}
-	var fc = &filterCriteria{
+	var fc = &FilterCriteria{
 		Field: types.StringValue(""),
 		Value: types.StringValue("true"),
 	}
 	for _, f := range fields {
 		fc.Field = types.StringValue(f)
-		cb, diags := getFieldMatcher(fc, nt)
+		cb, diags := GetFieldMatcher(fc, nt)
 		assert.Assert(t, len(diags) == 0)
 		assert.Assert(t, cb != nil)
 		res := cb(wm)
@@ -74,7 +74,7 @@ func TestBoolMatcher(t *testing.T) {
 	wm.F3 = types.BoolValue(r)
 	for _, f := range fields {
 		fc.Field = types.StringValue(f)
-		cb, diags := getFieldMatcher(fc, nt)
+		cb, diags := GetFieldMatcher(fc, nt)
 		assert.Assert(t, len(diags) == 0)
 		assert.Assert(t, cb != nil)
 		res := cb(wm)
@@ -92,14 +92,14 @@ func TestStringMatcher(t *testing.T) {
 
 	var nt = reflect.TypeOf(wm)
 	var fields = []string{"f1", "f2", "f3"}
-	var fc = &filterCriteria{
+	var fc = &FilterCriteria{
 		Field: types.StringValue(""),
 		Cmp:   types.StringValue("=="),
 		Value: types.StringValue(r),
 	}
 	for _, f := range fields {
 		fc.Field = types.StringValue(f)
-		cb, diags := getFieldMatcher(fc, nt)
+		cb, diags := GetFieldMatcher(fc, nt)
 		assert.Assert(t, len(diags) == 0)
 		assert.Assert(t, cb != nil)
 		res := cb(wm)
@@ -111,7 +111,7 @@ func TestStringMatcher(t *testing.T) {
 	wm.F3 = types.StringValue(r)
 	for _, f := range fields {
 		fc.Field = types.StringValue(f)
-		cb, diags := getFieldMatcher(fc, nt)
+		cb, diags := GetFieldMatcher(fc, nt)
 		assert.Assert(t, len(diags) == 0)
 		assert.Assert(t, cb != nil)
 		res := cb(wm)
@@ -129,14 +129,14 @@ func TestIntegerMatcher(t *testing.T) {
 
 	var nt = reflect.TypeOf(wm)
 	var fields = []string{"f1", "f2", "f3"}
-	var fc = &filterCriteria{
+	var fc = &FilterCriteria{
 		Field: types.StringValue(""),
 		Cmp:   types.StringValue("=="),
 		Value: types.StringValue(strconv.Itoa(int(r))),
 	}
 	for _, f := range fields {
 		fc.Field = types.StringValue(f)
-		cb, diags := getFieldMatcher(fc, nt)
+		cb, diags := GetFieldMatcher(fc, nt)
 		assert.Assert(t, len(diags) == 0)
 		assert.Assert(t, cb != nil)
 		res := cb(wm)
@@ -148,7 +148,7 @@ func TestIntegerMatcher(t *testing.T) {
 	wm.F3 = types.Int64Value(r)
 	for _, f := range fields {
 		fc.Field = types.StringValue(f)
-		cb, diags := getFieldMatcher(fc, nt)
+		cb, diags := GetFieldMatcher(fc, nt)
 		assert.Assert(t, len(diags) == 0)
 		assert.Assert(t, cb != nil)
 		res := cb(wm)

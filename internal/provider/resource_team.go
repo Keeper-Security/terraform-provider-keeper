@@ -93,7 +93,7 @@ func (r *teamResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 
 	var teams = r.management.EnterpriseData().Teams()
 	if state.NodeId.IsNull() || state.NodeId.ValueInt64() == 0 {
-		state.NodeId = types.Int64Value(r.management.EnterpriseData().GetRootNode().NodeId())
+		state.NodeId = types.Int64Value(r.management.EnterpriseData().RootNode().NodeId())
 	}
 
 	var team enterprise.ITeam
@@ -145,7 +145,7 @@ func (r *teamResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	if plan.NodeId.IsNull() || plan.NodeId.ValueInt64() == 0 {
-		plan.NodeId = types.Int64Value(r.management.EnterpriseData().GetRootNode().NodeId())
+		plan.NodeId = types.Int64Value(r.management.EnterpriseData().RootNode().NodeId())
 	}
 
 	var team enterprise.ITeam
@@ -197,7 +197,7 @@ func (r *teamResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		plan.NodeId = state.NodeId
 	}
 	if plan.NodeId.IsNull() || plan.NodeId.ValueInt64() == 0 {
-		plan.NodeId = types.Int64Value(r.management.EnterpriseData().GetRootNode().NodeId())
+		plan.NodeId = types.Int64Value(r.management.EnterpriseData().RootNode().NodeId())
 	}
 	if plan.TeamUid.IsNull() {
 		plan.TeamUid = state.TeamUid

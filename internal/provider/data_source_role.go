@@ -197,8 +197,7 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		mnm.CascadeNodeManagement = types.BoolValue(mn.CascadeNodeManagement())
 		var privileges = d.rolePrivileges.GetLink(mn.RoleId(), mn.ManagedNodeId())
 		if privileges != nil {
-			var pp = &mnm.Privileges
-			pp.fromKeeper(privileges.Privileges())
+			mnm.Privileges.FromKeeper(privileges.Privileges())
 		}
 		state.ManagedNodes = append(state.ManagedNodes, mnm)
 		return true
