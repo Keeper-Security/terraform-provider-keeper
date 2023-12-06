@@ -113,7 +113,7 @@ func (p *keeperEnterpriseProvider) Configure(ctx context.Context, req provider.C
 		api.SetLogger(logger)
 
 		if p.version == "test" {
-			p.management = test.NewloopbackManagement()
+			p.management = test.NewTestingManagement()
 		} else {
 			if config.ConfigurationPath.IsUnknown() {
 				resp.Diagnostics.AddAttributeError(

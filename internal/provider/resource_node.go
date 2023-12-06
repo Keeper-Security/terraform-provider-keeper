@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
+	"strconv"
 	"strings"
 	"terraform-provider-kepr/internal/model"
 )
@@ -101,7 +102,17 @@ func (nr *nodeResource) Configure(_ context.Context, req resource.ConfigureReque
 }
 
 func (nr *nodeResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("node_id"), req, resp)
+	var nodeId int64
+	var err error
+
+	if nodeId, err = strconv.ParseInt(req.ID, 10, 64); err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid node ID value.",
+			fmt.Sprintf("Interger value expected. Got \"%s\"", req.ID),
+		)
+		return
+	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("node_id"), nodeId)...)
 }
 
 func (nr *nodeResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -110,13 +121,12 @@ func (nr *nodeResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		return
 	}
 
-	if state.ParentId.IsNull() || state.ParentId.ValueInt64() == 0 {
-		state.ParentId = types.Int64Value(nr.management.EnterpriseData().RootNode().NodeId())
-	}
-
 	var nodes = nr.management.EnterpriseData().Nodes()
 	var node enterprise.INode
 	if state.NodeId.IsNull() {
+		if state.ParentId.IsNull() || state.ParentId.ValueInt64() == 0 {
+			state.ParentId = types.Int64Value(nr.management.EnterpriseData().RootNode().NodeId())
+		}
 		var nodeName = state.Name.ValueString()
 		var parentId = state.ParentId.ValueInt64()
 		nodes.GetAllEntities(func(t enterprise.INode) bool {
@@ -138,48 +148,6 @@ func (nr *nodeResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	} else {
 		resp.State.RemoveResource(ctx)
-	}
-}
-
-func (nr *nodeResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan nodeResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	var state nodeResourceModel
-	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	if plan.ParentId.IsNull() || plan.ParentId.ValueInt64() == 0 {
-		plan.ParentId = state.NodeId
-	}
-	if plan.ParentId.IsNull() || plan.ParentId.ValueInt64() == 0 {
-		plan.ParentId = types.Int64Value(nr.management.EnterpriseData().RootNode().NodeId())
-	}
-	if plan.NodeId.IsNull() {
-		plan.NodeId = state.NodeId
-	}
-	if plan.NodeId.IsNull() {
-		resp.Diagnostics.AddError(
-			"Update Node error: cannot resolve node ID",
-			"Could not resolve node ID",
-		)
-		return
-	}
-
-	var nodeId = plan.NodeId.ValueInt64()
-	var n = enterprise.NewNode(nodeId)
-	plan.toKeeper(n)
-
-	errs := nr.management.ModifyNodes(nil, []enterprise.INode{n}, nil)
-	for _, er := range errs {
-		resp.Diagnostics.AddError(
-			fmt.Sprintf("Update Node %s", plan.Name.ValueString()),
-			"Error occurred while updating a node: "+er.Error(),
-		)
-	}
-	if !resp.Diagnostics.HasError() {
-		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 	}
 }
 
@@ -243,6 +211,48 @@ func (nr *nodeResource) Create(ctx context.Context, req resource.CreateRequest, 
 	if !resp.Diagnostics.HasError() {
 		plan.NodeId = types.Int64Value(ne.NodeId())
 		plan.ParentId = types.Int64Value(ne.ParentId())
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+	}
+}
+
+func (nr *nodeResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan nodeResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	var state nodeResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if plan.ParentId.IsNull() || plan.ParentId.ValueInt64() == 0 {
+		plan.ParentId = state.ParentId
+	}
+	if plan.ParentId.IsNull() || plan.ParentId.ValueInt64() == 0 {
+		plan.ParentId = types.Int64Value(nr.management.EnterpriseData().RootNode().NodeId())
+	}
+	if plan.NodeId.IsNull() {
+		plan.NodeId = state.NodeId
+	}
+	if plan.NodeId.IsNull() {
+		resp.Diagnostics.AddError(
+			"Update Node error: cannot resolve node ID",
+			"Could not resolve node ID",
+		)
+		return
+	}
+
+	var nodeId = plan.NodeId.ValueInt64()
+	var n = enterprise.NewNode(nodeId)
+	plan.toKeeper(n)
+
+	errs := nr.management.ModifyNodes(nil, []enterprise.INode{n}, nil)
+	for _, er := range errs {
+		resp.Diagnostics.AddError(
+			fmt.Sprintf("Update Node %s", plan.Name.ValueString()),
+			"Error occurred while updating a node: "+er.Error(),
+		)
+	}
+	if !resp.Diagnostics.HasError() {
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 	}
 }
