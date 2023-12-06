@@ -34,7 +34,7 @@ func (rmr *roleMembershipResource) Metadata(_ context.Context, req resource.Meta
 func (rmr *roleMembershipResource) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"role_id": schema.StringAttribute{
+			"role_id": schema.Int64Attribute{
 				Required:    true,
 				Description: "Role ID",
 			},

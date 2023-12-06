@@ -6,10 +6,25 @@ import (
 	"terraform-provider-kepr/internal/model"
 )
 
-var _ enterprise.IEnterpriseManagement = new(loopbackManagement)
+var _ enterprise.IEnterpriseManagement = new(testingManagement)
 
-func NewloopbackManagement() (lm *loopbackManagement) {
-	lm = &loopbackManagement{
+//
+//	Enterprise ID:    1234    (5299989643264 base enterprise ID)
+// 	Enterprise name:  Kepr TF
+//
+// 	[Kepr TF]        (5299989643266)
+//	 +-- [Subnode]   (5299989643274)
+//   |   +-- User(s)
+//   |       +-- pending_user@company.com    (5299989643285)
+//	 +-- Role(s)
+//	 |   +--Keeper Administrator (5299989643267)
+//   +-- User(s)
+//   |   +-- user@company.com    (5299989643284)
+//   +-- Team(s)
+//   |   +-- Everyone            (MWaZlKLGNa585bX6sCui3g)
+
+func NewTestingManagement() enterprise.IEnterpriseManagement {
+	var lm = &testingManagement{
 		enterpriseId:     1234,
 		lastId:           1000,
 		enterpriseInfo:   newTestEnterpriseInfo(),
@@ -36,6 +51,11 @@ func NewloopbackManagement() (lm *loopbackManagement) {
 	rn.SetName(lm.enterpriseInfo.EnterpriseName())
 	lm.nodes[rn.NodeId()] = rn
 	lm.rootNode = rn
+
+	var sn = enterprise.NewNode(int64(lm.enterpriseId)<<32 + 10)
+	sn.SetName("Subnode")
+	sn.SetParentId(rn.NodeId())
+	lm.nodes[sn.NodeId()] = sn
 
 	var ra = enterprise.NewRole(int64(lm.enterpriseId)<<32 + 3)
 	ra.SetName("Keeper Administrator")
@@ -68,14 +88,23 @@ func NewloopbackManagement() (lm *loopbackManagement) {
 		np.SetPrivilege(p)
 	}
 	lm.rolePrivileges.addLink(np)
-	var err error
-	var eUid int64
-	if eUid, err = lm.GetEnterpriseId(); err != nil {
-		panic(err)
-	}
-	var us = enterprise.NewUser(eUid, "user@company.com")
+
+	var eUid = int64(lm.enterpriseId)<<32 + 20
+	var us = enterprise.NewUser(eUid, "user@company.com", "active")
 	us.SetNodeId(rn.NodeId())
 	us.SetFullName("Keeper Admin")
 	lm.users[us.EnterpriseUserId()] = us
-	return
+
+	eUid = int64(lm.enterpriseId)<<32 + 21
+	us = enterprise.NewUser(eUid, "pending_user@company.com", "inactive")
+	us.SetNodeId(sn.NodeId())
+	us.SetFullName("Invited User")
+	lm.users[us.EnterpriseUserId()] = us
+
+	var teamUid = "MWaZlKLGNa585bX6sCui3g"
+	var t = enterprise.NewTeam(teamUid)
+	t.SetName("Everyone")
+	t.SetNodeId(rn.NodeId())
+	lm.teams[teamUid] = t
+	return lm
 }

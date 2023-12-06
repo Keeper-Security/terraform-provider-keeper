@@ -8,13 +8,13 @@ import (
 )
 
 func getUserStatus(u enterprise.IUser) (status string) {
-	status = u.Status()
-	if u.Status() == "active" {
-		if u.Lock() > 0 {
+	status = string(u.Status())
+	if u.Status() == enterprise.UserStatus_Active {
+		if u.Lock() != enterprise.UserLock_Unlocked {
 			switch u.Lock() {
-			case 1:
+			case enterprise.UserLock_Locked:
 				status = "locked"
-			case 2:
+			case enterprise.UserLock_Disabled:
 				status = "disabled"
 			}
 		} else if u.AccountShareExpiration() > 0 {

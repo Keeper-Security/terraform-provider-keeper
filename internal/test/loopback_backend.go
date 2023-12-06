@@ -68,11 +68,7 @@ func (tl testLink[T, KS, KO]) addLink(t T) {
 	}
 	tl[link] = t
 }
-func (tl testLink[T, KS, KO]) deleteLink(t T) {
-	var link = enterprise.LinkKey[KS, KO]{
-		V1: t.SubjectUid(),
-		V2: t.ObjectUid(),
-	}
+func (tl testLink[T, KS, KO]) deleteLink(link enterprise.LinkKey[KS, KO]) {
 	delete(tl, link)
 }
 func (tl testLink[T, KS, KO]) deleteSubject(subjectUid KS) {
@@ -132,7 +128,7 @@ func (ei *testEnterpriseInfo) EcPrivateKey() *ecdh.PrivateKey {
 	return ei.ecPrivateKey
 }
 
-type loopbackManagement struct {
+type testingManagement struct {
 	enterpriseId     int32
 	lastId           int32
 	enterpriseInfo   *testEnterpriseInfo
@@ -157,81 +153,83 @@ type loopbackManagement struct {
 	managedCompanies testEntity[enterprise.IManagedCompany, int64]
 }
 
-func (lm *loopbackManagement) EnterpriseData() enterprise.IEnterpriseData {
+func (lm *testingManagement) EnterpriseData() enterprise.IEnterpriseData {
 	return lm
 }
-func (lm *loopbackManagement) EnterpriseInfo() enterprise.IEnterpriseInfo {
+func (lm *testingManagement) EnterpriseInfo() enterprise.IEnterpriseInfo {
 	return lm.enterpriseInfo
 }
-func (lm *loopbackManagement) Nodes() enterprise.IEnterpriseEntity[enterprise.INode, int64] {
+func (lm *testingManagement) Nodes() enterprise.IEnterpriseEntity[enterprise.INode, int64] {
 	return lm.nodes
 }
-func (lm *loopbackManagement) RootNode() enterprise.INode {
+func (lm *testingManagement) RootNode() enterprise.INode {
 	return lm.rootNode
 }
-func (lm *loopbackManagement) Roles() enterprise.IEnterpriseEntity[enterprise.IRole, int64] {
+func (lm *testingManagement) Roles() enterprise.IEnterpriseEntity[enterprise.IRole, int64] {
 	return lm.roles
 }
-func (lm *loopbackManagement) Users() enterprise.IEnterpriseEntity[enterprise.IUser, int64] {
+func (lm *testingManagement) Users() enterprise.IEnterpriseEntity[enterprise.IUser, int64] {
 	return lm.users
 }
-func (lm *loopbackManagement) Teams() enterprise.IEnterpriseEntity[enterprise.ITeam, string] {
+func (lm *testingManagement) Teams() enterprise.IEnterpriseEntity[enterprise.ITeam, string] {
 	return lm.teams
 }
-func (lm *loopbackManagement) TeamUsers() enterprise.IEnterpriseLink[enterprise.ITeamUser, string, int64] {
+func (lm *testingManagement) TeamUsers() enterprise.IEnterpriseLink[enterprise.ITeamUser, string, int64] {
 	return lm.teamUsers
 }
-func (lm *loopbackManagement) QueuedTeams() enterprise.IEnterpriseEntity[enterprise.IQueuedTeam, string] {
+func (lm *testingManagement) QueuedTeams() enterprise.IEnterpriseEntity[enterprise.IQueuedTeam, string] {
 	return lm.queuedTeams
 }
-func (lm *loopbackManagement) QueuedTeamUsers() enterprise.IEnterpriseLink[enterprise.IQueuedTeamUser, string, int64] {
+func (lm *testingManagement) QueuedTeamUsers() enterprise.IEnterpriseLink[enterprise.IQueuedTeamUser, string, int64] {
 	return lm.queuedTeamUsers
 }
-func (lm *loopbackManagement) RoleUsers() enterprise.IEnterpriseLink[enterprise.IRoleUser, int64, int64] {
+func (lm *testingManagement) RoleUsers() enterprise.IEnterpriseLink[enterprise.IRoleUser, int64, int64] {
 	return lm.roleUsers
 }
-func (lm *loopbackManagement) RoleTeams() enterprise.IEnterpriseLink[enterprise.IRoleTeam, int64, string] {
+func (lm *testingManagement) RoleTeams() enterprise.IEnterpriseLink[enterprise.IRoleTeam, int64, string] {
 	return lm.roleTeams
 }
-func (lm *loopbackManagement) ManagedNodes() enterprise.IEnterpriseLink[enterprise.IManagedNode, int64, int64] {
+func (lm *testingManagement) ManagedNodes() enterprise.IEnterpriseLink[enterprise.IManagedNode, int64, int64] {
 	return lm.managedNodes
 }
-func (lm *loopbackManagement) RolePrivileges() enterprise.IEnterpriseLink[enterprise.IRolePrivilege, int64, int64] {
+func (lm *testingManagement) RolePrivileges() enterprise.IEnterpriseLink[enterprise.IRolePrivilege, int64, int64] {
 	return lm.rolePrivileges
 }
-func (lm *loopbackManagement) RoleEnforcements() enterprise.IEnterpriseLink[enterprise.IRoleEnforcement, int64, string] {
+func (lm *testingManagement) RoleEnforcements() enterprise.IEnterpriseLink[enterprise.IRoleEnforcement, int64, string] {
 	return lm.roleEnforcements
 }
-func (lm *loopbackManagement) Licenses() enterprise.IEnterpriseEntity[enterprise.ILicense, int64] {
+func (lm *testingManagement) Licenses() enterprise.IEnterpriseEntity[enterprise.ILicense, int64] {
 	return lm.licenses
 }
-func (lm *loopbackManagement) UserAliases() enterprise.IEnterpriseLink[enterprise.IUserAlias, int64, string] {
+func (lm *testingManagement) UserAliases() enterprise.IEnterpriseLink[enterprise.IUserAlias, int64, string] {
 	return lm.userAliases
 }
-func (lm *loopbackManagement) SsoServices() enterprise.IEnterpriseEntity[enterprise.ISsoService, int64] {
+func (lm *testingManagement) SsoServices() enterprise.IEnterpriseEntity[enterprise.ISsoService, int64] {
 	return lm.ssoServices
 }
-func (lm *loopbackManagement) Bridges() enterprise.IEnterpriseEntity[enterprise.IBridge, int64] {
+func (lm *testingManagement) Bridges() enterprise.IEnterpriseEntity[enterprise.IBridge, int64] {
 	return lm.bridges
 }
-func (lm *loopbackManagement) Scims() enterprise.IEnterpriseEntity[enterprise.IScim, int64] {
+func (lm *testingManagement) Scims() enterprise.IEnterpriseEntity[enterprise.IScim, int64] {
 	return lm.scims
 }
-func (lm *loopbackManagement) ManagedCompanies() enterprise.IEnterpriseEntity[enterprise.IManagedCompany, int64] {
+func (lm *testingManagement) ManagedCompanies() enterprise.IEnterpriseEntity[enterprise.IManagedCompany, int64] {
 	return lm.managedCompanies
 }
 
-func (lm *loopbackManagement) GetEnterpriseId() (id int64, err error) {
+func (lm *testingManagement) GetEnterpriseId() (id int64, err error) {
 	id = int64(lm.enterpriseId)<<32 + int64(atomic.AddInt32(&lm.lastId, 1))
 	return
 }
-func (lm *loopbackManagement) ModifyNodes(nodesToAdd []enterprise.INode, nodesToUpdate []enterprise.INode, nodesToDelete []int64) (errs []error) {
+func (lm *testingManagement) ModifyNodes(nodesToAdd []enterprise.INode, nodesToUpdate []enterprise.INode, nodesToDelete []int64) (errs []error) {
 	var ok bool
 	if nodesToUpdate != nil {
 		for _, node := range nodesToUpdate {
 			var nodeId = node.NodeId()
 			if (nodeId&0xff == 2) && node.ParentId() > 0 {
 				errs = append(errs, api.NewKeeperApiError("bad_inputs_parent_id", "can't move root"))
+			} else if node.NodeId() == node.ParentId() {
+				errs = append(errs, api.NewKeeperApiError("bad_inputs_parent_id", "parent node is self"))
 			} else if _, ok = lm.nodes[nodeId]; ok {
 				if _, ok = lm.nodes[node.ParentId()]; ok {
 					lm.nodes[node.NodeId()] = node
@@ -262,7 +260,9 @@ func (lm *loopbackManagement) ModifyNodes(nodesToAdd []enterprise.INode, nodesTo
 	}
 	var parents = api.NewSet[int64]()
 	lm.nodes.GetAllEntities(func(r enterprise.INode) bool {
-		parents.Add(r.ParentId())
+		if r.ParentId() > 0 {
+			parents.Add(r.ParentId())
+		}
 		return true
 	})
 	lm.roles.GetAllEntities(func(r enterprise.IRole) bool {
@@ -287,7 +287,7 @@ func (lm *loopbackManagement) ModifyNodes(nodesToAdd []enterprise.INode, nodesTo
 	}
 	return
 }
-func (lm *loopbackManagement) ModifyRoles(rolesToAdd []enterprise.IRole, rolesToUpdate []enterprise.IRole, rolesToDelete []int64) (errs []error) {
+func (lm *testingManagement) ModifyRoles(rolesToAdd []enterprise.IRole, rolesToUpdate []enterprise.IRole, rolesToDelete []int64) (errs []error) {
 	var ok bool
 	if rolesToUpdate != nil {
 		for _, role := range rolesToUpdate {
@@ -346,7 +346,7 @@ func (lm *loopbackManagement) ModifyRoles(rolesToAdd []enterprise.IRole, rolesTo
 
 	return
 }
-func (lm *loopbackManagement) ModifyTeams(teamsToAdd []enterprise.ITeam, teamsToUpdate []enterprise.ITeam, teamsToDelete []string) (errs []error) {
+func (lm *testingManagement) ModifyTeams(teamsToAdd []enterprise.ITeam, teamsToUpdate []enterprise.ITeam, teamsToDelete []string) (errs []error) {
 	var ok bool
 	if teamsToUpdate != nil {
 		for _, team := range teamsToUpdate {
@@ -391,7 +391,7 @@ func (lm *loopbackManagement) ModifyTeams(teamsToAdd []enterprise.ITeam, teamsTo
 	return
 }
 
-func (lm *loopbackManagement) ModifyTeamUsers(teamUsersToAdd []enterprise.ITeamUser, teamUsersToRemove []enterprise.ITeamUser) (errs []error) {
+func (lm *testingManagement) ModifyTeamUsers(teamUsersToAdd []enterprise.ITeamUser, teamUsersToRemove []enterprise.ITeamUser) (errs []error) {
 	if teamUsersToAdd != nil {
 		for _, teamUser := range teamUsersToAdd {
 			var teamUid = teamUser.TeamUid()
@@ -423,7 +423,11 @@ func (lm *loopbackManagement) ModifyTeamUsers(teamUsersToAdd []enterprise.ITeamU
 			var eUserId = teamUser.EnterpriseUserId()
 			var l = lm.teamUsers.GetLink(teamUid, eUserId)
 			if l != nil {
-				lm.teamUsers.deleteLink(teamUser)
+				var link = enterprise.LinkKey[string, int64]{
+					V1: teamUid,
+					V2: eUserId,
+				}
+				lm.teamUsers.deleteLink(link)
 			} else {
 				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "team membership does not exist"))
 			}
@@ -431,7 +435,7 @@ func (lm *loopbackManagement) ModifyTeamUsers(teamUsersToAdd []enterprise.ITeamU
 	}
 	return
 }
-func (lm *loopbackManagement) ModifyRoleUsers(roleUsersToAdd []enterprise.IRoleUser, roleUsersToRemove []enterprise.IRoleUser) (errs []error) {
+func (lm *testingManagement) ModifyRoleUsers(roleUsersToAdd []enterprise.IRoleUser, roleUsersToRemove []enterprise.IRoleUser) (errs []error) {
 	if roleUsersToAdd != nil {
 		for _, roleUser := range roleUsersToAdd {
 			var roleId = roleUser.RoleId()
@@ -468,7 +472,11 @@ func (lm *loopbackManagement) ModifyRoleUsers(roleUsersToAdd []enterprise.IRoleU
 			var eUserId = roleUser.EnterpriseUserId()
 			var l = lm.roleUsers.GetLink(roleId, eUserId)
 			if l != nil {
-				lm.roleUsers.deleteLink(roleUser)
+				var link = enterprise.LinkKey[int64, int64]{
+					V1: roleId,
+					V2: eUserId,
+				}
+				lm.roleUsers.deleteLink(link)
 			} else {
 				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "role membership does not exist"))
 			}
@@ -477,7 +485,7 @@ func (lm *loopbackManagement) ModifyRoleUsers(roleUsersToAdd []enterprise.IRoleU
 	return
 }
 
-func (lm *loopbackManagement) ModifyRoleTeams(roleTeamsToAdd []enterprise.IRoleTeam, roleTeamsToRemove []enterprise.IRoleTeam) (errs []error) {
+func (lm *testingManagement) ModifyRoleTeams(roleTeamsToAdd []enterprise.IRoleTeam, roleTeamsToRemove []enterprise.IRoleTeam) (errs []error) {
 	if roleTeamsToAdd != nil {
 		for _, roleTeam := range roleTeamsToAdd {
 			var roleId = roleTeam.RoleId()
@@ -515,7 +523,11 @@ func (lm *loopbackManagement) ModifyRoleTeams(roleTeamsToAdd []enterprise.IRoleT
 			var teamUid = roleTeam.TeamUid()
 			var l = lm.roleTeams.GetLink(roleId, teamUid)
 			if l != nil {
-				lm.roleTeams.deleteLink(roleTeam)
+				var link = enterprise.LinkKey[int64, string]{
+					V1: roleId,
+					V2: teamUid,
+				}
+				lm.roleTeams.deleteLink(link)
 			} else {
 				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "role-team does not exist"))
 			}
@@ -524,6 +536,70 @@ func (lm *loopbackManagement) ModifyRoleTeams(roleTeamsToAdd []enterprise.IRoleT
 	return
 }
 
-func (lm *loopbackManagement) Commit() (errs []error) {
+func (lm *testingManagement) ModifyManagedNodes(managedNodesToAdd []enterprise.IManagedNode, managedNodesToUpdate []enterprise.IManagedNode, managedNodesToRemove []enterprise.IManagedNode) (errs []error) {
+	var ok bool
+	var link enterprise.LinkKey[int64, int64]
+	if managedNodesToUpdate != nil {
+		for _, managedNode := range managedNodesToUpdate {
+			link.V1 = managedNode.RoleId()
+			link.V2 = managedNode.ManagedNodeId()
+			if _, ok = lm.managedNodes[link]; !ok {
+				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "managed node"))
+			} else {
+				lm.managedNodes[link] = managedNode
+			}
+		}
+	}
+	if managedNodesToAdd != nil {
+		for _, managedNode := range managedNodesToAdd {
+			link.V1 = managedNode.RoleId()
+			link.V2 = managedNode.ManagedNodeId()
+			if _, ok = lm.managedNodes[link]; !ok {
+				if _, ok = lm.roles[managedNode.RoleId()]; ok {
+					if _, ok = lm.nodes[managedNode.ManagedNodeId()]; ok {
+						lm.managedNodes[link] = managedNode
+					} else {
+						errs = append(errs, api.NewKeeperApiError("doesnt_exist", "node"))
+					}
+				} else {
+					errs = append(errs, api.NewKeeperApiError("doesnt_exist", "role"))
+				}
+			} else {
+				errs = append(errs, api.NewKeeperApiError("exists", "already exists"))
+			}
+		}
+	}
+
+	if managedNodesToRemove != nil {
+		for _, managedNode := range managedNodesToRemove {
+			link.V1 = managedNode.RoleId()
+			link.V2 = managedNode.ManagedNodeId()
+			if _, ok = lm.managedNodes[link]; ok {
+				lm.managedNodes.deleteLink(link)
+				lm.rolePrivileges.deleteLink(link)
+			} else {
+				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "existing managed node"))
+			}
+		}
+	}
+
+	return
+}
+
+func (lm *testingManagement) ModifyRolePrivileges(privileges []enterprise.IRolePrivilege) (errs []error) {
+	for _, e := range privileges {
+		lm.rolePrivileges.addLink(e)
+	}
+	return
+}
+
+func (lm *testingManagement) ModifyRoleEnforcements(enforcementsToSet []enterprise.IRoleEnforcement) (err []error) {
+	for _, e := range enforcementsToSet {
+		lm.roleEnforcements.addLink(e)
+	}
+	return
+}
+
+func (lm *testingManagement) Commit() (errs []error) {
 	return
 }

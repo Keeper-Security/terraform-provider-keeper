@@ -99,9 +99,9 @@ func (d *usersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			return true
 		}
 	} else {
-		var activeFlag = "inactive"
+		var activeFlag enterprise.UserStatus = enterprise.UserStatus_Inactive
 		if uq.IsActive.ValueBool() {
-			activeFlag = "active"
+			activeFlag = enterprise.UserStatus_Active
 		}
 		activeMatcher = func(user enterprise.IUser) bool {
 			return user.Status() == activeFlag
