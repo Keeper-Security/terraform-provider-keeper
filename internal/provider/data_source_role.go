@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
 	"strings"
+	"terraform-provider-kepr/internal/model"
 )
 
 var (
@@ -17,16 +18,16 @@ var (
 )
 
 type roleDataSourceModel struct {
-	RoleId         types.Int64         `tfsdk:"role_id"`
-	Name           types.String        `tfsdk:"name"`
-	Node           *nodeShortModel     `tfsdk:"node"`
-	VisibleBelow   types.Bool          `tfsdk:"visible_below"`
-	NewUserInherit types.Bool          `tfsdk:"new_user_inherit"`
-	IsAdmin        types.Bool          `tfsdk:"is_admin"`
-	ManagedNodes   []*managedNodeModel `tfsdk:"managed_nodes"`
-	IncludeMembers types.Bool          `tfsdk:"include_members"`
-	Users          []*userShortModel   `tfsdk:"users"`
-	Teams          []*teamShortModel   `tfsdk:"teams"`
+	RoleId         types.Int64             `tfsdk:"role_id"`
+	Name           types.String            `tfsdk:"name"`
+	Node           *nodeShortModel         `tfsdk:"node"`
+	VisibleBelow   types.Bool              `tfsdk:"visible_below"`
+	NewUserInherit types.Bool              `tfsdk:"new_user_inherit"`
+	IsAdmin        types.Bool              `tfsdk:"is_admin"`
+	ManagedNodes   []*managedNodeModel     `tfsdk:"managed_nodes"`
+	IncludeMembers types.Bool              `tfsdk:"include_members"`
+	Users          []*model.UserShortModel `tfsdk:"users"`
+	Teams          []*model.TeamShortModel `tfsdk:"teams"`
 }
 
 func (model *roleDataSourceModel) fromKeeper(role enterprise.IRole, isAdmin bool, node enterprise.INode) {
@@ -95,13 +96,13 @@ func (d *roleDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			"users": schema.ListNestedAttribute{
 				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
-					Attributes: userShortSchemaAttributes,
+					Attributes: model.UserShortSchemaAttributes,
 				},
 			},
 			"teams": schema.ListNestedAttribute{
 				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
-					Attributes: teamShortSchemaAttributes,
+					Attributes: model.TeamShortSchemaAttributes,
 				},
 			},
 			"managed_nodes": schema.ListNestedAttribute{
@@ -206,8 +207,8 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		d.roleUsers.GetLinksBySubject(role.RoleId(), func(ru enterprise.IRoleUser) bool {
 			var user = d.users.GetEntity(ru.EnterpriseUserId())
 			if user != nil {
-				var usm = new(userShortModel)
-				usm.fromKeeper(user)
+				var usm = new(model.UserShortModel)
+				usm.FromKeeper(user)
 				state.Users = append(state.Users, usm)
 			}
 			return true
@@ -215,8 +216,8 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		d.roleTeams.GetLinksBySubject(role.RoleId(), func(rt enterprise.IRoleTeam) bool {
 			var team = d.teams.GetEntity(rt.TeamUid())
 			if team != nil {
-				var tsm = new(teamShortModel)
-				tsm.fromKeeper(team)
+				var tsm = new(model.TeamShortModel)
+				tsm.FromKeeper(team)
 				state.Teams = append(state.Teams, tsm)
 			}
 			return true

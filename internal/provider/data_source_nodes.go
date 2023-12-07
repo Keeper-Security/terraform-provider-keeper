@@ -18,6 +18,10 @@ var (
 	_ datasource.DataSource = &nodesDataSource{}
 )
 
+func newNodesDataSource() datasource.DataSource {
+	return &nodesDataSource{}
+}
+
 type subNodesCriteria struct {
 	NodeId        types.Int64 `tfsdk:"node_id"`
 	IncludeParent types.Bool  `tfsdk:"include_parent"`
@@ -32,10 +36,6 @@ type nodesDataSourceModel struct {
 
 type nodesDataSource struct {
 	nodes enterprise.IEnterpriseEntity[enterprise.INode, int64]
-}
-
-func NewNodesDataSource() datasource.DataSource {
-	return &nodesDataSource{}
 }
 
 func (d *nodesDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {

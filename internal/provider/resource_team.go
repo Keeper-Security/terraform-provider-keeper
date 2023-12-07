@@ -13,6 +13,7 @@ import (
 	"github.com/keeper-security/keeper-sdk-golang/sdk/api"
 	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
 	"strings"
+	"terraform-provider-kepr/internal/model"
 )
 
 func newTeamResource() resource.Resource {
@@ -86,7 +87,7 @@ func (r *teamResource) Configure(_ context.Context, req resource.ConfigureReques
 }
 
 func (r *teamResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state teamModel
+	var state model.TeamModel
 	if resp.Diagnostics.Append(req.State.Get(ctx, &state)...); resp.Diagnostics.HasError() {
 		return
 	}
@@ -116,7 +117,7 @@ func (r *teamResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	}
 
 	if team != nil {
-		state.fromKeeper(team)
+		state.FromKeeper(team)
 		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	} else {
 		resp.State.RemoveResource(ctx)
@@ -128,7 +129,7 @@ func (r *teamResource) ImportState(ctx context.Context, req resource.ImportState
 }
 
 func (r *teamResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan teamModel
+	var plan model.TeamModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -168,7 +169,7 @@ func (r *teamResource) Create(ctx context.Context, req resource.CreateRequest, r
 		te = enterprise.CloneTeam(team)
 		toUpdate = append(toUpdate, te)
 	}
-	plan.toKeeper(te)
+	plan.ToKeeper(te)
 
 	var errs = r.management.ModifyTeams(toAdd, toUpdate, nil)
 	for _, er := range errs {
@@ -185,9 +186,9 @@ func (r *teamResource) Create(ctx context.Context, req resource.CreateRequest, r
 }
 
 func (r *teamResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan teamModel
+	var plan model.TeamModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	var state teamModel
+	var state model.TeamModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -212,7 +213,7 @@ func (r *teamResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	var teamUid = plan.TeamUid.ValueString()
 	var t = enterprise.NewTeam(teamUid)
-	plan.toKeeper(t)
+	plan.ToKeeper(t)
 
 	errs := r.management.ModifyTeams(nil, []enterprise.ITeam{t}, nil)
 	for _, er := range errs {
@@ -227,7 +228,7 @@ func (r *teamResource) Update(ctx context.Context, req resource.UpdateRequest, r
 }
 
 func (r *teamResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state teamModel
+	var state model.TeamModel
 
 	if resp.Diagnostics.Append(req.State.Get(ctx, &state)...); resp.Diagnostics.HasError() {
 		return
@@ -237,7 +238,7 @@ func (r *teamResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	for _, er := range errs {
 		resp.Diagnostics.AddError(
 			fmt.Sprintf("Delete Team \"%s\" error: %s", state.Name.ValueString(), er),
-			"Error occurred while creating a team",
+			"Error occurred while deleting a team",
 		)
 	}
 }

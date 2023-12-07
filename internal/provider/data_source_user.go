@@ -17,41 +17,45 @@ var (
 	_ datasource.DataSourceWithConfigure = &userDataSource{}
 )
 
-type userDataSourceModel struct {
-	EnterpriseUserId       types.Int64       `tfsdk:"enterprise_user_id"`
-	Username               types.String      `tfsdk:"username"`
-	NodeId                 types.Int64       `tfsdk:"node_id"`
-	Status                 types.String      `tfsdk:"status"`
-	AccountShareExpiration types.Int64       `tfsdk:"account_share_expiration"`
-	TfaEnabled             types.Bool        `tfsdk:"tfa_enabled"`
-	FullName               types.String      `tfsdk:"full_name"`
-	JobTitle               types.String      `tfsdk:"job_title"`
-	IncludeTeams           types.Bool        `tfsdk:"include_teams"`
-	Teams                  []*teamShortModel `tfsdk:"teams"`
-	IncludeRoles           types.Bool        `tfsdk:"include_roles"`
-	Roles                  []*roleShortModel `tfsdk:"roles"`
+func newUserDataSource() datasource.DataSource {
+	return &userDataSource{}
 }
 
-func (model *userDataSourceModel) fromKeeper(keeper enterprise.IUser) {
-	model.EnterpriseUserId = types.Int64Value(keeper.EnterpriseUserId())
-	model.Username = types.StringValue(keeper.Username())
-	model.NodeId = types.Int64Value(keeper.NodeId())
-	model.Status = types.StringValue(getUserStatus(keeper))
-	model.TfaEnabled = types.BoolValue(keeper.TfaEnabled())
+type userDataSourceModel struct {
+	EnterpriseUserId       types.Int64             `tfsdk:"enterprise_user_id"`
+	Username               types.String            `tfsdk:"username"`
+	NodeId                 types.Int64             `tfsdk:"node_id"`
+	Status                 types.String            `tfsdk:"status"`
+	AccountShareExpiration types.Int64             `tfsdk:"account_share_expiration"`
+	TfaEnabled             types.Bool              `tfsdk:"tfa_enabled"`
+	FullName               types.String            `tfsdk:"full_name"`
+	JobTitle               types.String            `tfsdk:"job_title"`
+	IncludeTeams           types.Bool              `tfsdk:"include_teams"`
+	Teams                  []*model.TeamShortModel `tfsdk:"teams"`
+	IncludeRoles           types.Bool              `tfsdk:"include_roles"`
+	Roles                  []*roleShortModel       `tfsdk:"roles"`
+}
+
+func (uds *userDataSourceModel) fromKeeper(keeper enterprise.IUser) {
+	uds.EnterpriseUserId = types.Int64Value(keeper.EnterpriseUserId())
+	uds.Username = types.StringValue(keeper.Username())
+	uds.NodeId = types.Int64Value(keeper.NodeId())
+	uds.Status = types.StringValue(model.GetUserStatus(keeper))
+	uds.TfaEnabled = types.BoolValue(keeper.TfaEnabled())
 	if len(keeper.FullName()) > 0 {
-		model.FullName = types.StringValue(keeper.FullName())
+		uds.FullName = types.StringValue(keeper.FullName())
 	} else {
-		model.FullName = types.StringNull()
+		uds.FullName = types.StringNull()
 	}
 	if len(keeper.JobTitle()) > 0 {
-		model.JobTitle = types.StringValue(keeper.JobTitle())
+		uds.JobTitle = types.StringValue(keeper.JobTitle())
 	} else {
-		model.JobTitle = types.StringNull()
+		uds.JobTitle = types.StringNull()
 	}
 	if keeper.AccountShareExpiration() > 0 {
-		model.AccountShareExpiration = types.Int64Value(keeper.AccountShareExpiration())
+		uds.AccountShareExpiration = types.Int64Value(keeper.AccountShareExpiration())
 	} else {
-		model.AccountShareExpiration = types.Int64Null()
+		uds.AccountShareExpiration = types.Int64Null()
 	}
 }
 
@@ -64,10 +68,6 @@ type userDataSource struct {
 	managedNodes enterprise.IEnterpriseLink[enterprise.IManagedNode, int64, int64]
 }
 
-func NewUserDataSource() datasource.DataSource {
-	return &userDataSource{}
-}
-
 func (d *userDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_user"
 }
@@ -77,10 +77,12 @@ func (d *userDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 	var filterAttributes = map[string]schema.Attribute{
 		"enterprise_user_id": schema.Int64Attribute{
 			Optional:    true,
+			Computed:    true,
 			Description: "Enterprise User ID",
 		},
 		"username": schema.StringAttribute{
 			Optional:    true,
+			Computed:    true,
 			Description: "User email",
 		},
 		"include_teams": schema.BoolAttribute{
@@ -96,7 +98,7 @@ func (d *userDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 		"teams": schema.ListNestedAttribute{
 			Computed: true,
 			NestedObject: schema.NestedAttributeObject{
-				Attributes: teamShortSchemaAttributes,
+				Attributes: model.TeamShortSchemaAttributes,
 			},
 		},
 	}
@@ -110,7 +112,7 @@ func (d *userDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 	}
 
 	resp.Schema = schema.Schema{
-		Attributes: model.MergeMaps(filterAttributes, userSchemaAttributes, teamShortAttribute, roleShortAttribute),
+		Attributes: model.MergeMaps(filterAttributes, model.UserSchemaAttributes, teamShortAttribute, roleShortAttribute),
 	}
 }
 
@@ -186,8 +188,8 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		d.teamUsers.GetLinksByObject(user.EnterpriseUserId(), func(tu enterprise.ITeamUser) bool {
 			var t = d.teams.GetEntity(tu.TeamUid())
 			if t != nil {
-				var tsm = new(teamShortModel)
-				tsm.fromKeeper(t)
+				var tsm = new(model.TeamShortModel)
+				tsm.FromKeeper(t)
 				state.Teams = append(state.Teams, tsm)
 			}
 			return true

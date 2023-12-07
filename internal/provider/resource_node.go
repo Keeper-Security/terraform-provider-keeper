@@ -267,7 +267,7 @@ func (nr *nodeResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 	for _, er := range errs {
 		resp.Diagnostics.AddError(
 			fmt.Sprintf("Delete Node \"%s\" error: %s", state.Name.ValueString(), er),
-			"Error occurred while creating a node",
+			"Error occurred while deleting a node",
 		)
 	}
 }

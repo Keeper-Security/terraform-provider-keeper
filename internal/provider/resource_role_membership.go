@@ -247,7 +247,4 @@ func (rmr *roleMembershipResource) Delete(ctx context.Context, req resource.Dele
 	var plan roleMembershipResourceModel
 	plan.RoleId = state.RoleId
 	resp.Diagnostics.Append(rmr.applyMembership(plan)...)
-	if !resp.Diagnostics.HasError() {
-		resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
-	}
 }

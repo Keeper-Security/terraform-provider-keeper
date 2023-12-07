@@ -227,15 +227,17 @@ func (p *keeperEnterpriseProvider) Configure(ctx context.Context, req provider.C
 func (p *keeperEnterpriseProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		newTeamResource, newNodeResource,
-		newTeamMembershipResource,
+		newTeamMembershipResource, newRoleMembershipResource,
+		newManagedNodeResource,
 	}
 }
 
 func (p *keeperEnterpriseProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		NewNodeDataSource, NewNodesDataSource,
-		NewTeamDataSource, NewTeamsDataSource,
-		NewRoleDataSource, NewRolesDataSource, NewPrivilegeDataSource,
-		NewUserDataSource, NewUsersDataSource,
+		newNodeDataSource, newNodesDataSource,
+		newTeamDataSource, newTeamsDataSource,
+		NewRoleDataSource, NewRolesDataSource,
+		newPrivilegeDataSource,
+		newUserDataSource, newUsersDataSource,
 	}
 }
