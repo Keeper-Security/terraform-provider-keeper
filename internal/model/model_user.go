@@ -1,4 +1,4 @@
-package provider
+package model
 
 import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func getUserStatus(u enterprise.IUser) (status string) {
+func GetUserStatus(u enterprise.IUser) (status string) {
 	status = string(u.Status())
 	if u.Status() == enterprise.UserStatus_Active {
 		if u.Lock() != enterprise.UserLock_Unlocked {
@@ -28,19 +28,19 @@ func getUserStatus(u enterprise.IUser) (status string) {
 	return
 }
 
-type userShortModel struct {
+type UserShortModel struct {
 	EnterpriseUserId types.Int64  `tfsdk:"enterprise_user_id"`
 	Username         types.String `tfsdk:"username"`
 	Status           types.String `tfsdk:"status"`
 }
 
-func (model *userShortModel) fromKeeper(keeper enterprise.IUser) {
-	model.EnterpriseUserId = types.Int64Value(keeper.EnterpriseUserId())
-	model.Username = types.StringValue(keeper.Username())
-	model.Status = types.StringValue(getUserStatus(keeper))
+func (usm *UserShortModel) FromKeeper(keeper enterprise.IUser) {
+	usm.EnterpriseUserId = types.Int64Value(keeper.EnterpriseUserId())
+	usm.Username = types.StringValue(keeper.Username())
+	usm.Status = types.StringValue(GetUserStatus(keeper))
 }
 
-var userShortSchemaAttributes = map[string]schema.Attribute{
+var UserShortSchemaAttributes = map[string]schema.Attribute{
 	"enterprise_user_id": schema.Int64Attribute{
 		Computed:    true,
 		Description: "Enterprise User ID",
@@ -55,7 +55,7 @@ var userShortSchemaAttributes = map[string]schema.Attribute{
 	},
 }
 
-type userModel struct {
+type UserModel struct {
 	EnterpriseUserId       types.Int64  `tfsdk:"enterprise_user_id"`
 	Username               types.String `tfsdk:"username"`
 	NodeId                 types.Int64  `tfsdk:"node_id"`
@@ -66,11 +66,11 @@ type userModel struct {
 	JobTitle               types.String `tfsdk:"job_title"`
 }
 
-func (model *userModel) fromKeeper(keeper enterprise.IUser) {
+func (model *UserModel) FromKeeper(keeper enterprise.IUser) {
 	model.EnterpriseUserId = types.Int64Value(keeper.EnterpriseUserId())
 	model.Username = types.StringValue(keeper.Username())
 	model.NodeId = types.Int64Value(keeper.NodeId())
-	model.Status = types.StringValue(getUserStatus(keeper))
+	model.Status = types.StringValue(GetUserStatus(keeper))
 	model.TfaEnabled = types.BoolValue(keeper.TfaEnabled())
 	if len(keeper.FullName()) > 0 {
 		model.FullName = types.StringValue(keeper.FullName())
@@ -89,7 +89,7 @@ func (model *userModel) fromKeeper(keeper enterprise.IUser) {
 	}
 }
 
-var userSchemaAttributes = map[string]schema.Attribute{
+var UserSchemaAttributes = map[string]schema.Attribute{
 	"enterprise_user_id": schema.Int64Attribute{
 		Computed:    true,
 		Description: "Enterprise User ID",

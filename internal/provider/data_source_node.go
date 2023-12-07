@@ -17,6 +17,10 @@ var (
 	_ datasource.DataSourceWithConfigValidators = &nodeDataSource{}
 )
 
+func newNodeDataSource() datasource.DataSource {
+	return &nodeDataSource{}
+}
+
 type nodeDataSourceModel struct {
 	NodeId             types.Int64            `tfsdk:"node_id"`
 	Name               types.String           `tfsdk:"name"`
@@ -74,9 +78,6 @@ type nodeDataSource struct {
 	ssoProviders enterprise.IEnterpriseEntity[enterprise.ISsoService, int64]
 }
 
-func NewNodeDataSource() datasource.DataSource {
-	return &nodeDataSource{}
-}
 func (d *nodeDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_node"
 }
@@ -86,18 +87,22 @@ func (d *nodeDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 	var filterAttributes = map[string]schema.Attribute{
 		"is_root": schema.BoolAttribute{
 			Optional:    true,
+			Computed:    true,
 			Description: "Root Node",
 		},
 		"node_id": schema.Int64Attribute{
 			Optional:    true,
+			Computed:    true,
 			Description: "Node ID",
 		},
 		"name": schema.StringAttribute{
 			Optional:    true,
+			Computed:    true,
 			Description: "Node Name",
 		},
 		"parent_id": schema.Int64Attribute{
 			Optional:    true,
+			Computed:    true,
 			Description: "Parent Node ID",
 		},
 	}

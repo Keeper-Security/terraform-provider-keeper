@@ -23,41 +23,49 @@ func newManagedNodeResource() resource.Resource {
 var privilegesResourceAttributes = map[string]schema.Attribute{
 	"manage_nodes": schema.BoolAttribute{
 		Optional:    true,
+		Computed:    true,
 		Default:     booldefault.StaticBool(false),
 		Description: "Manage Nodes",
 	},
 	"manage_users": schema.BoolAttribute{
 		Optional:    true,
+		Computed:    true,
 		Default:     booldefault.StaticBool(false),
 		Description: "Manage Users",
 	},
 	"manage_teams": schema.BoolAttribute{
 		Optional:    true,
+		Computed:    true,
 		Default:     booldefault.StaticBool(false),
 		Description: "Manage Teams",
 	},
 	"manage_roles": schema.BoolAttribute{
 		Optional:    true,
+		Computed:    true,
 		Default:     booldefault.StaticBool(false),
 		Description: "Manage Roles",
 	},
 	"manage_reports": schema.BoolAttribute{
 		Optional:    true,
+		Computed:    true,
 		Default:     booldefault.StaticBool(false),
 		Description: "Manage Reporting and Alerts",
 	},
 	"manage_sso": schema.BoolAttribute{
 		Optional:    true,
+		Computed:    true,
 		Default:     booldefault.StaticBool(false),
 		Description: "Manage Bridge/SSO",
 	},
 	"device_approval": schema.BoolAttribute{
 		Optional:    true,
+		Computed:    true,
 		Default:     booldefault.StaticBool(false),
 		Description: "Perform Device Approvals",
 	},
 	"manage_record_types": schema.BoolAttribute{
 		Optional:    true,
+		Computed:    true,
 		Default:     booldefault.StaticBool(false),
 		Description: "Manage Record Types in Vault",
 		MarkdownDescription: "This permission allows the admin rights to create, edit, or delete Record Types " +
@@ -65,21 +73,25 @@ var privilegesResourceAttributes = map[string]schema.Attribute{
 	},
 	"share_admin": schema.BoolAttribute{
 		Optional:    true,
+		Computed:    true,
 		Default:     booldefault.StaticBool(false),
 		Description: "Share Admin",
 	},
 	"run_compliance_reports": schema.BoolAttribute{
 		Optional:    true,
+		Computed:    true,
 		Default:     booldefault.StaticBool(false),
 		Description: "Run Compliance Reports",
 	},
 	"transfer_account": schema.BoolAttribute{
 		Optional:    true,
+		Computed:    true,
 		Default:     booldefault.StaticBool(false),
 		Description: "Transfer Account",
 	},
 	"manage_companies": schema.BoolAttribute{
 		Optional:    true,
+		Computed:    true,
 		Default:     booldefault.StaticBool(false),
 		Description: "Manage Companies",
 	},
@@ -107,7 +119,7 @@ func (mnr *managedNodeResource) Schema(_ context.Context, req resource.SchemaReq
 				Required:    true,
 				Description: "Role ID",
 			},
-			"managed_node_id": schema.Int64Attribute{
+			"node_id": schema.Int64Attribute{
 				Required:    true,
 				Description: "Managed Node ID",
 			},
@@ -211,12 +223,12 @@ func (mnr *managedNodeResource) Read(ctx context.Context, req resource.ReadReque
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func (mnr *managedNodeResource) applyManagedNode(model managedNodeResourceModel) (diags diag.Diagnostics) {
-	var roleId = model.RoleId.ValueInt64()
-	var nodeId = model.NodeId.ValueInt64()
+func (mnr *managedNodeResource) applyManagedNode(plan managedNodeResourceModel) (diags diag.Diagnostics) {
+	var roleId = plan.RoleId.ValueInt64()
+	var nodeId = plan.NodeId.ValueInt64()
 	var cascade = true
-	if !model.CascadeNodeManagement.IsNull() {
-		cascade = model.CascadeNodeManagement.ValueBool()
+	if !plan.CascadeNodeManagement.IsNull() {
+		cascade = plan.CascadeNodeManagement.ValueBool()
 	}
 
 	var addManagedNodes []enterprise.IManagedNode
@@ -229,7 +241,7 @@ func (mnr *managedNodeResource) applyManagedNode(model managedNodeResourceModel)
 				fmt.Sprintf("Role not found: RoleID=\"%d\"", roleId))
 			return
 		}
-		if n := mnr.management.EnterpriseData().Roles().GetEntity(nodeId); n == nil {
+		if n := mnr.management.EnterpriseData().Nodes().GetEntity(nodeId); n == nil {
 			diags.AddError("Create Managed Node: node not found",
 				fmt.Sprintf("Node not found: NodeID=\"%d\"", nodeId))
 			return
@@ -261,9 +273,9 @@ func (mnr *managedNodeResource) applyManagedNode(model managedNodeResourceModel)
 		var imn = enterprise.NewManagedNode(roleId, nodeId)
 		imn.SetCascadeNodeManagement(cascade)
 		addManagedNodes = append(addManagedNodes, imn)
-		if model.Privileges != nil {
+		if plan.Privileges != nil {
 			var rp = enterprise.NewRolePrivilege(roleId, nodeId)
-			for _, e := range model.Privileges.ToKeeper() {
+			for _, e := range plan.Privileges.ToKeeper() {
 				rp.SetPrivilege(e)
 			}
 			rolePrivileges = append(rolePrivileges, rp)
@@ -286,8 +298,8 @@ func (mnr *managedNodeResource) applyManagedNode(model managedNodeResourceModel)
 		return
 	}
 
-	if model.Privileges != nil {
-		var ps = model.Privileges.ToKeeper()
+	if plan.Privileges != nil {
+		var ps = plan.Privileges.ToKeeper()
 		var modified = true
 		if orp := mnr.management.EnterpriseData().RolePrivileges().GetLink(roleId, nodeId); orp != nil {
 			var s = api.NewSet[string]()
@@ -345,15 +357,25 @@ func (mnr *managedNodeResource) Update(ctx context.Context, req resource.UpdateR
 }
 
 func (mnr *managedNodeResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state roleMembershipResourceModel
+	var state managedNodeResourceModel
 	if resp.Diagnostics.Append(req.State.Get(ctx, &state)...); resp.Diagnostics.HasError() {
 		return
 	}
 
-	var plan roleMembershipResourceModel
-	plan.RoleId = state.RoleId
-	//resp.Diagnostics.Append(rmr.applyMembership(plan)...)
-	if !resp.Diagnostics.HasError() {
-		resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
+	var roleId = state.RoleId.ValueInt64()
+	var nodeId = state.NodeId.ValueInt64()
+	var mn = mnr.management.EnterpriseData().ManagedNodes().GetLink(roleId, nodeId)
+	if mn != nil {
+		var errs = mnr.management.ModifyManagedNodes(nil, nil, []enterprise.IManagedNode{mn})
+		for _, er := range errs {
+			resp.Diagnostics.AddError(
+				fmt.Sprintf("Assign Managed Node privileges: RoleID=\"%d\"; NodeID=\"%d\"", roleId, nodeId),
+				fmt.Sprintf("Error: %s", er),
+			)
+		}
+
+	} else {
+		resp.Diagnostics.AddError("Delete Managed Node: managed node not found",
+			fmt.Sprintf("Managed Node not found: RoleID=\"%d\"; NodeId=\"%d\"", roleId, nodeId))
 	}
 }

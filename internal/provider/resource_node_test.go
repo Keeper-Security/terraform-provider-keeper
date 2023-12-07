@@ -1,77 +1,28 @@
 package provider
 
 import (
-	"errors"
-	"fmt"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"strconv"
+	"terraform-provider-kepr/internal/model"
 	"testing"
 )
 
-func TestAccNodeResource(t *testing.T) {
+func TestAccNodeResource_Create(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Create
 			{
-				Config: testAccCreateSsoNodeConfig(),
+				Config: testConfigNodeCreate,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("kepr_node.SSO", "name", "SSO"),
 					resource.TestCheckResourceAttr("kepr_node.SSO", "restrict_visibility", "true"),
 				),
 			},
-			// Import
-			{
-				Config:        testAccImportSubnode(),
-				ImportState:   true,
-				ResourceName:  "kepr_node.subnode",
-				ImportStateId: "5299989643274",
-				ImportStateCheck: func(states []*terraform.InstanceState) (err error) {
-					var state = states[0]
-					var eId int
-					var value string
-					var ok bool
-					if value, ok = state.Attributes["parent_id"]; ok {
-						if eId, err = strconv.Atoi(value); err != nil {
-							return
-						}
-					} else {
-						err = errors.New("\"parent_id\" attribute has not been set")
-						return
-					}
-					if eId != 5299989643266 {
-						err = errors.New(fmt.Sprintf("\"parent_id\" value is incorrect. Expected: 5299989643266; Got: %d", eId))
-						return
-					}
-					if value, ok = state.Attributes["name"]; ok {
-						if value != "Subnode" {
-							err = errors.New(fmt.Sprintf("\"name\" value is incorrect. Expected: \"Subnode\"; Got: %s", value))
-							return
-						}
-					} else {
-						err = errors.New("\"name\" attribute has not been set")
-						return
-					}
-
-					return
-				},
-				ImportStatePersist: true,
-			},
-			// Update and Read testing
-			{
-				Config: testAccImportSubnode(),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("kepr_node.subnode", "name", "Subnodes"),
-				),
-			},
-			//// Delete testing automatically occurs in TestCase
 		},
 	})
 }
 
-func testAccCreateSsoNodeConfig() string {
-	return `
+const testConfigNodeCreate = `
 data "kepr_node" "root" {
 	is_root = true
 }
@@ -81,12 +32,37 @@ resource "kepr_node" "SSO" {
 	restrict_visibility = true
 }
 `
+
+func TestAccNodeResource_Import(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Import
+			{
+				Config:        testConfigNodeImport,
+				ImportState:   true,
+				ResourceName:  "kepr_node.subnode",
+				ImportStateId: "5299989643274",
+				ImportStateCheck: model.ComposeAggregateImportStateCheckFunc(
+					model.TestCheckImportStateAttr("parent_id", "5299989643266"),
+					model.TestCheckImportStateAttr("node_id", "5299989643274"),
+					model.TestCheckImportStateAttr("name", "Subnode"),
+				),
+				ImportStatePersist: true,
+			},
+			// Update and Read testing
+			{
+				Config: testConfigNodeImport,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("kepr_node.subnode", "name", "Subnodes"),
+				),
+			},
+		},
+	})
 }
 
-func testAccImportSubnode() string {
-	return `
+const testConfigNodeImport = `
 resource "kepr_node" "subnode" {
 	name = "Subnodes"
 }
 `
-}

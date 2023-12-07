@@ -12,6 +12,10 @@ var (
 	_ datasource.DataSource = &privilegeDataSource{}
 )
 
+func newPrivilegeDataSource() datasource.DataSource {
+	return &privilegeDataSource{}
+}
+
 var privilegesAttributes = map[string]schema.Attribute{
 	"manage_nodes": schema.BoolAttribute{
 		Optional:    true,
@@ -80,9 +84,6 @@ var privilegesAttributes = map[string]schema.Attribute{
 type privilegeDataSource struct {
 }
 
-func NewPrivilegeDataSource() datasource.DataSource {
-	return &privilegeDataSource{}
-}
 func (d *privilegeDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_privileges"
 }

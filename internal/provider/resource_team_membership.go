@@ -189,7 +189,4 @@ func (tmr *teamMembershipResource) Delete(ctx context.Context, req resource.Dele
 	var plan teamMembershipResourceModel
 	plan.TeamUid = state.TeamUid
 	resp.Diagnostics.Append(tmr.applyMembership(plan)...)
-	if !resp.Diagnostics.HasError() {
-		resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
-	}
 }

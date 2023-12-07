@@ -1,4 +1,4 @@
-package provider
+package model
 
 import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -6,7 +6,7 @@ import (
 	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
 )
 
-type teamModel struct {
+type TeamModel struct {
 	TeamUid       types.String `tfsdk:"team_uid"`
 	Name          types.String `tfsdk:"name"`
 	NodeId        types.Int64  `tfsdk:"node_id"`
@@ -15,7 +15,7 @@ type teamModel struct {
 	RestrictView  types.Bool   `tfsdk:"restrict_view"`
 }
 
-func (model *teamModel) toKeeper(keeper enterprise.ITeamEdit) {
+func (model *TeamModel) ToKeeper(keeper enterprise.ITeamEdit) {
 	keeper.SetName(model.Name.ValueString())
 	if model.NodeId.IsNull() {
 		keeper.SetNodeId(0)
@@ -27,7 +27,7 @@ func (model *teamModel) toKeeper(keeper enterprise.ITeamEdit) {
 	keeper.SetRestrictView(!model.RestrictView.IsNull() && model.RestrictView.ValueBool())
 }
 
-func (model *teamModel) fromKeeper(keeper enterprise.ITeam) {
+func (model *TeamModel) FromKeeper(keeper enterprise.ITeam) {
 	model.TeamUid = types.StringValue(keeper.TeamUid())
 	model.Name = types.StringValue(keeper.Name())
 	model.NodeId = types.Int64Value(keeper.NodeId())
@@ -36,7 +36,7 @@ func (model *teamModel) fromKeeper(keeper enterprise.ITeam) {
 	model.RestrictView = types.BoolValue(keeper.RestrictView())
 }
 
-var teamSchemaAttributes = map[string]schema.Attribute{
+var TeamSchemaAttributes = map[string]schema.Attribute{
 	"team_uid": schema.StringAttribute{
 		Computed:    true,
 		Description: "Team UID",
@@ -63,17 +63,17 @@ var teamSchemaAttributes = map[string]schema.Attribute{
 	},
 }
 
-type teamShortModel struct {
+type TeamShortModel struct {
 	TeamUid types.String `tfsdk:"team_uid"`
 	Name    types.String `tfsdk:"name"`
 }
 
-func (model *teamShortModel) fromKeeper(keeper enterprise.ITeam) {
+func (model *TeamShortModel) FromKeeper(keeper enterprise.ITeam) {
 	model.TeamUid = types.StringValue(keeper.TeamUid())
 	model.Name = types.StringValue(keeper.Name())
 }
 
-var teamShortSchemaAttributes = map[string]schema.Attribute{
+var TeamShortSchemaAttributes = map[string]schema.Attribute{
 	"team_uid": schema.StringAttribute{
 		Computed:    true,
 		Description: "Team UID",

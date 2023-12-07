@@ -5,13 +5,12 @@ import (
 	"testing"
 )
 
-func TestAccPrivilegesDataSource_Define(t *testing.T) {
+func TestAccDataSourcePrivileges_Define(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		PreCheck:                 func() { testAccPreCheck(t) },
 		Steps: []resource.TestStep{
 			{
-				Config: testAccPrivilegesDataSourceConfig,
+				Config: testConfigDataSourcePrivileges,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.kepr_privileges.test", "manage_nodes", "true"),
 					resource.TestCheckResourceAttr("data.kepr_privileges.test", "manage_users", "true"),
@@ -30,7 +29,7 @@ func TestAccPrivilegesDataSource_Define(t *testing.T) {
 		}})
 }
 
-const testAccPrivilegesDataSourceConfig = `
+const testConfigDataSourcePrivileges = `
 data "kepr_privileges" "test" {
   manage_nodes = true
   manage_users = true

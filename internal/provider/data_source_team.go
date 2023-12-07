@@ -17,16 +17,20 @@ var (
 	_ datasource.DataSourceWithConfigure = &teamDataSource{}
 )
 
+func newTeamDataSource() datasource.DataSource {
+	return &teamDataSource{}
+}
+
 type teamDataSourceModel struct {
-	TeamUid        types.String      `tfsdk:"team_uid"`
-	Name           types.String      `tfsdk:"name"`
-	NodeId         types.Int64       `tfsdk:"node_id"`
-	RestrictEdit   types.Bool        `tfsdk:"restrict_edit"`
-	RestrictShare  types.Bool        `tfsdk:"restrict_share"`
-	RestrictView   types.Bool        `tfsdk:"restrict_view"`
-	IncludeMembers types.Bool        `tfsdk:"include_members"`
-	Users          []*userShortModel `tfsdk:"users"`
-	Roles          []*roleShortModel `tfsdk:"roles"`
+	TeamUid        types.String            `tfsdk:"team_uid"`
+	Name           types.String            `tfsdk:"name"`
+	NodeId         types.Int64             `tfsdk:"node_id"`
+	RestrictEdit   types.Bool              `tfsdk:"restrict_edit"`
+	RestrictShare  types.Bool              `tfsdk:"restrict_share"`
+	RestrictView   types.Bool              `tfsdk:"restrict_view"`
+	IncludeMembers types.Bool              `tfsdk:"include_members"`
+	Users          []*model.UserShortModel `tfsdk:"users"`
+	Roles          []*roleShortModel       `tfsdk:"roles"`
 }
 
 func (model *teamDataSourceModel) fromKeeper(keeper enterprise.ITeam) {
@@ -47,10 +51,6 @@ type teamDataSource struct {
 	managedNodes enterprise.IEnterpriseLink[enterprise.IManagedNode, int64, int64]
 }
 
-func NewTeamDataSource() datasource.DataSource {
-	return &teamDataSource{}
-}
-
 func (d *teamDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_team"
 }
@@ -60,10 +60,12 @@ func (d *teamDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 	var filterAttributes = map[string]schema.Attribute{
 		"team_uid": schema.StringAttribute{
 			Optional:    true,
+			Computed:    true,
 			Description: "Team UID",
 		},
 		"name": schema.StringAttribute{
 			Optional:    true,
+			Computed:    true,
 			Description: "Team Name",
 		},
 		"include_members": schema.BoolAttribute{
@@ -75,7 +77,7 @@ func (d *teamDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 		"users": schema.ListNestedAttribute{
 			Computed: true,
 			NestedObject: schema.NestedAttributeObject{
-				Attributes: userShortSchemaAttributes,
+				Attributes: model.UserShortSchemaAttributes,
 			},
 		},
 	}
@@ -88,7 +90,7 @@ func (d *teamDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 		},
 	}
 	resp.Schema = schema.Schema{
-		Attributes: model.MergeMaps(filterAttributes, teamSchemaAttributes, usersAttribute, rolesAttribute),
+		Attributes: model.MergeMaps(filterAttributes, model.TeamSchemaAttributes, usersAttribute, rolesAttribute),
 	}
 }
 
@@ -162,8 +164,8 @@ func (d *teamDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		d.teamUsers.GetLinksBySubject(team.TeamUid(), func(tu enterprise.ITeamUser) bool {
 			var u = d.users.GetEntity(tu.EnterpriseUserId())
 			if u != nil {
-				var um = new(userShortModel)
-				um.fromKeeper(u)
+				var um = new(model.UserShortModel)
+				um.FromKeeper(u)
 				state.Users = append(state.Users, um)
 			}
 			return true

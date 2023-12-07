@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/keeper-security/keeper-sdk-golang/sdk/api"
 	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
 	"reflect"
 	"strings"
@@ -19,20 +20,21 @@ var (
 	_ datasource.DataSource = &usersDataSource{}
 )
 
+func newUsersDataSource() datasource.DataSource {
+	return &usersDataSource{}
+}
+
 type usersDataSourceModel struct {
-	IsActive types.Bool            `tfsdk:"is_active"`
-	Filter   *model.FilterCriteria `tfsdk:"filter"`
-	Emails   types.Set             `tfsdk:"emails"`
-	Nodes    types.Set             `tfsdk:"nodes"`
-	Users    []*userModel          `tfsdk:"users"`
+	IsActive     types.Bool            `tfsdk:"is_active"`
+	Filter       *model.FilterCriteria `tfsdk:"filter"`
+	Emails       types.Set             `tfsdk:"emails"`
+	NodeCriteria *model.NodeCriteria   `tfsdk:"nodes"`
+	Users        []*model.UserModel    `tfsdk:"users"`
 }
 
 type usersDataSource struct {
 	users enterprise.IEnterpriseEntity[enterprise.IUser, int64]
-}
-
-func NewUsersDataSource() datasource.DataSource {
-	return &usersDataSource{}
+	nodes enterprise.IEnterpriseEntity[enterprise.INode, int64]
 }
 
 func (d *usersDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -50,10 +52,10 @@ func (d *usersDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 				Description: "List of emails",
 				ElementType: types.StringType,
 			},
-			"nodes": schema.SetAttribute{
+			"nodes": schema.SingleNestedAttribute{
+				Attributes:  model.NodeCriteriaAttributes,
 				Optional:    true,
-				Description: "List of node IDs",
-				ElementType: types.Int64Type,
+				Description: "Search By node filter",
 			},
 			"filter": schema.SingleNestedAttribute{
 				Attributes:  model.FilterCriteriaAttributes,
@@ -63,7 +65,7 @@ func (d *usersDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 			"users": schema.ListNestedAttribute{
 				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
-					Attributes: userSchemaAttributes,
+					Attributes: model.UserSchemaAttributes,
 				},
 			},
 		},
@@ -76,6 +78,7 @@ func (d *usersDataSource) Configure(ctx context.Context, req datasource.Configur
 	}
 	if ed, ok := req.ProviderData.(enterprise.IEnterpriseData); ok {
 		d.users = ed.Users()
+		d.nodes = ed.Nodes()
 	} else {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
@@ -99,7 +102,7 @@ func (d *usersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			return true
 		}
 	} else {
-		var activeFlag enterprise.UserStatus = enterprise.UserStatus_Inactive
+		var activeFlag = enterprise.UserStatus_Inactive
 		if uq.IsActive.ValueBool() {
 			activeFlag = enterprise.UserStatus_Active
 		}
@@ -108,60 +111,41 @@ func (d *usersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		}
 	}
 
-	var cb model.Matcher
+	var userMatcher model.Matcher
+	var nodeMatcher model.NodeMatcher
 	var diags diag.Diagnostics
 	if uq.Filter != nil {
-		cb, diags = model.GetFieldMatcher(uq.Filter, reflect.TypeOf((*userModel)(nil)))
+		userMatcher, diags = model.GetFieldMatcher(uq.Filter, reflect.TypeOf((*model.UserModel)(nil)))
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-	} else if !uq.Nodes.IsNull() {
-		var nodes = make(map[int64]bool)
-		var sv types.Set
-		sv, diags = uq.Nodes.ToSetValue(ctx)
+	} else if uq.NodeCriteria != nil {
+		nodeMatcher, diags = model.GetNodeMatcher(uq.NodeCriteria, d.nodes)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
-			return
-		}
-		for _, v := range sv.Elements() {
-			var ok bool
-			var i64v types.Int64
-			if i64v, ok = v.(types.Int64); ok {
-				nodes[i64v.ValueInt64()] = true
-			}
-		}
-		cb = func(mm interface{}) (b bool) {
-			var ok bool
-			var m1 *userModel
-			if m1, ok = mm.(*userModel); ok {
-				if !m1.NodeId.IsNull() {
-					_, b = nodes[m1.NodeId.ValueInt64()]
-				}
-			}
 			return
 		}
 	} else if !uq.Emails.IsNull() {
-		var nodes = make(map[string]bool)
+		var us = api.NewSet[string]()
+
 		var sv types.Set
 		sv, diags = uq.Emails.ToSetValue(ctx)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
 		for _, v := range sv.Elements() {
 			var ok bool
 			var strv types.String
 			if strv, ok = v.(types.String); ok {
-				nodes[strings.ToLower(strv.ValueString())] = true
+				us.Add(strings.ToLower(strv.ValueString()))
 			}
 		}
-		cb = func(mm interface{}) (b bool) {
+
+		userMatcher = func(mm interface{}) (b bool) {
 			var ok bool
-			var m1 *userModel
-			if m1, ok = mm.(*userModel); ok {
+			var m1 *model.UserModel
+			if m1, ok = mm.(*model.UserModel); ok {
 				if !m1.Username.IsNull() {
-					_, b = nodes[strings.ToLower(m1.Username.ValueString())]
+					var username = strings.ToLower(m1.Username.ValueString())
+					b = us.Has(username)
 				}
 			}
 			return
@@ -173,10 +157,15 @@ func (d *usersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		if !activeMatcher(u) {
 			return
 		}
-		var um = new(userModel)
-		um.fromKeeper(u)
-		if cb != nil {
-			if !cb(um) {
+		if nodeMatcher != nil {
+			if !nodeMatcher(u.NodeId()) {
+				return
+			}
+		}
+		var um = new(model.UserModel)
+		um.FromKeeper(u)
+		if userMatcher != nil {
+			if !userMatcher(um) {
 				return
 			}
 		}

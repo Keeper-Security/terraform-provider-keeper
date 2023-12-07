@@ -16,19 +16,19 @@ var (
 	_ datasource.DataSource = &teamsDataSource{}
 )
 
+func newTeamsDataSource() datasource.DataSource {
+	return &teamsDataSource{}
+}
+
 type teamsDataSourceModel struct {
 	FilterCriteria *model.FilterCriteria `tfsdk:"filter"`
 	NodeCriteria   *model.NodeCriteria   `tfsdk:"nodes"`
-	Teams          []*teamModel          `tfsdk:"teams"`
+	Teams          []*model.TeamModel    `tfsdk:"teams"`
 }
 
 type teamsDataSource struct {
 	teams enterprise.IEnterpriseEntity[enterprise.ITeam, string]
 	nodes enterprise.IEnterpriseEntity[enterprise.INode, int64]
-}
-
-func NewTeamsDataSource() datasource.DataSource {
-	return &teamsDataSource{}
 }
 
 func (d *teamsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -52,7 +52,7 @@ func (d *teamsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 			"teams": schema.ListNestedAttribute{
 				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
-					Attributes: teamSchemaAttributes,
+					Attributes: model.TeamSchemaAttributes,
 				},
 			},
 		},
@@ -75,7 +75,7 @@ func (d *teamsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	}
 
 	var fm model.Matcher
-	fm, diags = model.GetFieldMatcher(tq.FilterCriteria, reflect.TypeOf((*teamModel)(nil)))
+	fm, diags = model.GetFieldMatcher(tq.FilterCriteria, reflect.TypeOf((*model.TeamModel)(nil)))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -88,8 +88,8 @@ func (d *teamsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 				return true
 			}
 		}
-		var team = new(teamModel)
-		team.fromKeeper(t)
+		var team = new(model.TeamModel)
+		team.FromKeeper(t)
 		if fm != nil {
 			if !fm(team) {
 				return true

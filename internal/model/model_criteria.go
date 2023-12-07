@@ -218,7 +218,7 @@ func getStrMatcher(field reflect.StructField, structType reflect.Type, strValue 
 			case StrOp_Matches:
 				var err error
 				var matched bool
-				if matched, err = path.Match(*strValue, *sv); err == nil {
+				if matched, err = path.Match(strings.ToLower(*strValue), strings.ToLower(*sv)); err == nil {
 					return matched
 				}
 			}

@@ -14,12 +14,11 @@ var _ enterprise.IEnterpriseManagement = new(testingManagement)
 //
 // 	[Kepr TF]        (5299989643266)
 //	 +-- [Subnode]   (5299989643274)
-//   |   +-- User(s)
-//   |       +-- pending_user@company.com    (5299989643285)
 //	 +-- Role(s)
 //	 |   +--Keeper Administrator (5299989643267)
 //   +-- User(s)
 //   |   +-- user@company.com    (5299989643284)
+//   |   +-- pending_user@company.com    (5299989643285)
 //   +-- Team(s)
 //   |   +-- Everyone            (MWaZlKLGNa585bX6sCui3g)
 
@@ -55,6 +54,7 @@ func NewTestingManagement() enterprise.IEnterpriseManagement {
 	var sn = enterprise.NewNode(int64(lm.enterpriseId)<<32 + 10)
 	sn.SetName("Subnode")
 	sn.SetParentId(rn.NodeId())
+	sn.SetRestrictVisibility(true)
 	lm.nodes[sn.NodeId()] = sn
 
 	var ra = enterprise.NewRole(int64(lm.enterpriseId)<<32 + 3)
@@ -89,22 +89,29 @@ func NewTestingManagement() enterprise.IEnterpriseManagement {
 	}
 	lm.rolePrivileges.addLink(np)
 
+	var teamUid = "MWaZlKLGNa585bX6sCui3g"
+	var t = enterprise.NewTeam(teamUid)
+	t.SetName("Everyone")
+	t.SetNodeId(rn.NodeId())
+	lm.teams[teamUid] = t
+
 	var eUid = int64(lm.enterpriseId)<<32 + 20
 	var us = enterprise.NewUser(eUid, "user@company.com", "active")
 	us.SetNodeId(rn.NodeId())
 	us.SetFullName("Keeper Admin")
 	lm.users[us.EnterpriseUserId()] = us
 
+	var teamUser = enterprise.NewTeamUser(teamUid, eUid)
+	lm.teamUsers.addLink(teamUser)
+
+	var roleUser = enterprise.NewRoleUser(ra.RoleId(), eUid)
+	lm.roleUsers.addLink(roleUser)
+
 	eUid = int64(lm.enterpriseId)<<32 + 21
 	us = enterprise.NewUser(eUid, "pending_user@company.com", "inactive")
-	us.SetNodeId(sn.NodeId())
+	us.SetNodeId(rn.NodeId())
 	us.SetFullName("Invited User")
 	lm.users[us.EnterpriseUserId()] = us
 
-	var teamUid = "MWaZlKLGNa585bX6sCui3g"
-	var t = enterprise.NewTeam(teamUid)
-	t.SetName("Everyone")
-	t.SetNodeId(rn.NodeId())
-	lm.teams[teamUid] = t
 	return lm
 }
