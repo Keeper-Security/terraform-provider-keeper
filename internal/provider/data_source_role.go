@@ -28,6 +28,7 @@ type roleDataSourceModel struct {
 	IncludeMembers types.Bool              `tfsdk:"include_members"`
 	Users          []*model.UserShortModel `tfsdk:"users"`
 	Teams          []*model.TeamShortModel `tfsdk:"teams"`
+	Enforcements	*model.EnforcementsDataSourceModel		`tfsdk:"enforcements"`
 }
 
 func (model *roleDataSourceModel) fromKeeper(role enterprise.IRole, isAdmin bool, node enterprise.INode) {
@@ -49,6 +50,7 @@ type roleDataSource struct {
 	nodes          enterprise.IEnterpriseEntity[enterprise.INode, int64]
 	managedNodes   enterprise.IEnterpriseLink[enterprise.IManagedNode, int64, int64]
 	rolePrivileges enterprise.IEnterpriseLink[enterprise.IRolePrivilege, int64, int64]
+	roleEnforcements enterprise.IEnterpriseLink[enterprise.IRoleEnforcement, int64, string]
 	roleTeams      enterprise.IEnterpriseLink[enterprise.IRoleTeam, int64, string]
 	teams          enterprise.IEnterpriseEntity[enterprise.ITeam, string]
 }
@@ -111,6 +113,11 @@ func (d *roleDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 					Attributes: managedNodeSchemaAttributes,
 				},
 			},
+			"enforcements": schema.SingleNestedAttribute{
+				Optional:	true,
+				Description:"Role enforcemnts",
+				Attributes: enforcementsAttributes,
+			},
 		},
 	}
 }
@@ -125,6 +132,7 @@ func (d *roleDataSource) Configure(ctx context.Context, req datasource.Configure
 		d.users = ed.Users()
 		d.managedNodes = ed.ManagedNodes()
 		d.rolePrivileges = ed.RolePrivileges()
+		d.roleEnforcements = ed.RoleEnforcements()
 		d.nodes = ed.Nodes()
 		d.roleTeams = ed.RoleTeams()
 		d.teams = ed.Teams()
@@ -223,6 +231,16 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 			return true
 		})
 	}
+	enforcements := make(map[string]string)
+	d.roleEnforcements.GetLinksBySubject(role.RoleId(), func(re enterprise.IRoleEnforcement) bool {
+		if re != nil {
+			enforcements[re.EnforcementType()] = re.Value()
+		}
+		return true
+	})
+	state.Enforcements = new(model.EnforcementsDataSourceModel)
+	state.Enforcements.FromKeeper(enforcements)
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }

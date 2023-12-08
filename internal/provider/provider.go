@@ -238,6 +238,10 @@ func (p *keeperEnterpriseProvider) DataSources(ctx context.Context) []func() dat
 		newTeamDataSource, newTeamsDataSource,
 		NewRoleDataSource, NewRolesDataSource,
 		newPrivilegeDataSource,
+		NewEnforcementsDataSource,NewEnforcementsAccountDataSource, NewEnforcementsLoginDataSource,
+		NewEnforcementsAllowIpListDataSource, NewEnforcementsPlatformDataSource, NewEnforcementsSharingDataSource,
+		NewEnforcements2faDataSource, NewEnforcementsKeeperFillDataSource, NewEnforcementsRecordTypesDataSource,
+		NewEnforcementsVaultDataSource,
 		newUserDataSource, newUsersDataSource,
 	}
 }
