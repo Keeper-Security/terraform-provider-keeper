@@ -1,10 +1,13 @@
 package model
 
 import (
+	"context"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"go.uber.org/zap"
+	"go.uber.org/zap/buffer"
 	"go.uber.org/zap/zapcore"
 	"strings"
 )
@@ -57,13 +60,18 @@ func MergeMaps[K comparable, V any](maps ...map[K]V) (m map[K]V) {
 }
 
 type nopCore struct {
-	level zapcore.Level
+	level   zapcore.Level
+	context context.Context
+	encoder zapcore.Encoder
 }
 
-// NewNopCore returns a no-op Core.
-func NewNopCore() zapcore.Core {
+// NewTerraformCore returns a zap Core.
+func NewTerraformCore(ctx context.Context, level zapcore.Level) zapcore.Core {
+	var e = zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig())
 	return nopCore{
-		level: zapcore.InfoLevel,
+		context: ctx,
+		level:   level,
+		encoder: e,
 	}
 }
 func (n nopCore) Enabled(l zapcore.Level) bool  { return n.level <= l }
@@ -71,5 +79,20 @@ func (n nopCore) With([]zap.Field) zapcore.Core { return n }
 func (n nopCore) Check(e zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
 	return ce.AddCore(e, n)
 }
-func (nopCore) Write(zapcore.Entry, []zap.Field) error { return nil }
-func (nopCore) Sync() error                            { return nil }
+func (n nopCore) Write(entry zapcore.Entry, fields []zap.Field) (err error) {
+	var b *buffer.Buffer
+	if b, err = n.encoder.EncodeEntry(entry, fields); err == nil {
+		switch entry.Level {
+		case zapcore.DebugLevel:
+			tflog.Debug(n.context, b.String())
+		case zapcore.InfoLevel:
+			tflog.Info(n.context, b.String())
+		case zapcore.WarnLevel:
+			tflog.Warn(n.context, b.String())
+		case zapcore.ErrorLevel:
+			tflog.Error(n.context, b.String())
+		}
+	}
+	return
+}
+func (nopCore) Sync() error { return nil }

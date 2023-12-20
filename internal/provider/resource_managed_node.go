@@ -9,11 +9,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/api"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
+	"github.com/keeper-security/keeper-sdk-golang/api"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
 	"strconv"
 	"strings"
-	"terraform-provider-kepr/internal/model"
+	"terraform-provider-keeper/internal/model"
 )
 
 func newManagedNodeResource() resource.Resource {
@@ -214,7 +214,7 @@ func (mnr *managedNodeResource) Read(ctx context.Context, req resource.ReadReque
 	var p = mnr.management.EnterpriseData().RolePrivileges().GetLink(roleId, nodeId)
 	state.Privileges = new(model.PrivilegeDataSourceModel)
 	if p != nil {
-		state.Privileges.FromKeeper(p.Privileges())
+		state.Privileges.FromKeeper(p)
 	}
 
 	if resp.Diagnostics.Append(diags...); resp.Diagnostics.HasError() {
@@ -233,7 +233,6 @@ func (mnr *managedNodeResource) applyManagedNode(plan managedNodeResourceModel) 
 
 	var addManagedNodes []enterprise.IManagedNode
 	var updateManagedNodes []enterprise.IManagedNode
-	var rolePrivileges []enterprise.IRolePrivilege
 	var mn = mnr.management.EnterpriseData().ManagedNodes().GetLink(roleId, nodeId)
 	if mn == nil {
 		if r := mnr.management.EnterpriseData().Roles().GetEntity(roleId); r == nil {
@@ -273,13 +272,6 @@ func (mnr *managedNodeResource) applyManagedNode(plan managedNodeResourceModel) 
 		var imn = enterprise.NewManagedNode(roleId, nodeId)
 		imn.SetCascadeNodeManagement(cascade)
 		addManagedNodes = append(addManagedNodes, imn)
-		if plan.Privileges != nil {
-			var rp = enterprise.NewRolePrivilege(roleId, nodeId)
-			for _, e := range plan.Privileges.ToKeeper() {
-				rp.SetPrivilege(e)
-			}
-			rolePrivileges = append(rolePrivileges, rp)
-		}
 	} else {
 		if cascade != mn.CascadeNodeManagement() {
 			var imn = enterprise.NewManagedNode(roleId, nodeId)
@@ -299,32 +291,14 @@ func (mnr *managedNodeResource) applyManagedNode(plan managedNodeResourceModel) 
 	}
 
 	if plan.Privileges != nil {
-		var ps = plan.Privileges.ToKeeper()
-		var modified = true
-		if orp := mnr.management.EnterpriseData().RolePrivileges().GetLink(roleId, nodeId); orp != nil {
-			var s = api.NewSet[string]()
-			s.Union(ps)
-			s.Difference(orp.Privileges())
-			if len(s) == 0 {
-				s.Union(orp.Privileges())
-				s.Difference(ps)
-				if len(s) == 0 {
-					modified = false
-				}
-			}
-		}
-		if modified {
-			var rp = enterprise.NewRolePrivilege(roleId, nodeId)
-			for _, e := range ps {
-				rp.SetPrivilege(e)
-			}
-			errs = mnr.management.ModifyRolePrivileges([]enterprise.IRolePrivilege{rp})
-			for _, er := range errs {
-				diags.AddError(
-					fmt.Sprintf("Assign Managed Node privileges: RoleID=\"%d\"; NodeID=\"%d\"", roleId, nodeId),
-					fmt.Sprintf("Error: %s", er),
-				)
-			}
+		var rp = enterprise.NewRolePrivilege(roleId, nodeId)
+		plan.Privileges.ToKeeper(rp)
+		errs = mnr.management.ModifyRolePrivileges([]enterprise.IRolePrivilege{rp})
+		for _, er := range errs {
+			diags.AddError(
+				fmt.Sprintf("Assign Managed Node privileges: RoleID=\"%d\"; NodeID=\"%d\"", roleId, nodeId),
+				fmt.Sprintf("Error: %s", er),
+			)
 		}
 	}
 	return

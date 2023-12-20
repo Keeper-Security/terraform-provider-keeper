@@ -5,9 +5,17 @@ import (
 )
 
 type EnforcementsRecordTypesDataSourceModel struct {
-	RestrictRecordTypes	types.String	`tfsdk:"restrict_record_types"`
+	RestrictRecordTypes types.String `tfsdk:"restrict_record_types"`
 }
 
-func (model *EnforcementsRecordTypesDataSourceModel) FromKeeper(enforcements map[string]string) {
-	model.RestrictRecordTypes = types.StringValue(enforcements["restrict_record_types"])
+func (ertm *EnforcementsRecordTypesDataSourceModel) FromKeeper(enforcements map[string]string) {
+	setStringValue(&ertm.RestrictRecordTypes, "restrict_record_types", enforcements)
+}
+
+func (ertm *EnforcementsRecordTypesDataSourceModel) ToKeeper(enforcements map[string]string) {
+	getStringValue(ertm.RestrictRecordTypes, "restrict_record_types", enforcements)
+}
+
+func (ertm *EnforcementsRecordTypesDataSourceModel) IsBlank() bool {
+	return ertm.RestrictRecordTypes.IsNull()
 }

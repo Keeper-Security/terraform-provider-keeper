@@ -8,9 +8,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
 	"strings"
-	"terraform-provider-kepr/internal/model"
+	"terraform-provider-keeper/internal/model"
 )
 
 var (
@@ -30,16 +30,16 @@ type teamDataSourceModel struct {
 	RestrictView   types.Bool              `tfsdk:"restrict_view"`
 	IncludeMembers types.Bool              `tfsdk:"include_members"`
 	Users          []*model.UserShortModel `tfsdk:"users"`
-	Roles          []*roleShortModel       `tfsdk:"roles"`
+	Roles          []*model.RoleShortModel `tfsdk:"roles"`
 }
 
-func (model *teamDataSourceModel) fromKeeper(keeper enterprise.ITeam) {
-	model.TeamUid = types.StringValue(keeper.TeamUid())
-	model.Name = types.StringValue(keeper.Name())
-	model.NodeId = types.Int64Value(keeper.NodeId())
-	model.RestrictEdit = types.BoolValue(keeper.RestrictEdit())
-	model.RestrictShare = types.BoolValue(keeper.RestrictShare())
-	model.RestrictView = types.BoolValue(keeper.RestrictView())
+func (tm *teamDataSourceModel) fromKeeper(keeper enterprise.ITeam) {
+	tm.TeamUid = types.StringValue(keeper.TeamUid())
+	tm.Name = types.StringValue(keeper.Name())
+	tm.NodeId = types.Int64Value(keeper.NodeId())
+	tm.RestrictEdit = types.BoolValue(keeper.RestrictEdit())
+	tm.RestrictShare = types.BoolValue(keeper.RestrictShare())
+	tm.RestrictView = types.BoolValue(keeper.RestrictView())
 }
 
 type teamDataSource struct {
@@ -85,7 +85,7 @@ func (d *teamDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 		"roles": schema.ListNestedAttribute{
 			Computed: true,
 			NestedObject: schema.NestedAttributeObject{
-				Attributes: roleShortSchemaAttributes,
+				Attributes: model.RoleShortSchemaAttributes,
 			},
 		},
 	}
@@ -135,7 +135,7 @@ func (d *teamDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	if teamMatcher == nil {
 		resp.Diagnostics.AddError(
 			"Search criteria is not provided for \"team\" data source",
-			fmt.Sprintf("Search criteria is not provided for \"team\" data source"),
+			"Search criteria is not provided for \"team\" data source",
 		)
 		return
 	}
@@ -152,7 +152,7 @@ func (d *teamDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	if team == nil {
 		resp.Diagnostics.AddError(
 			"Team not found",
-			fmt.Sprintf("Cannot find a team according to the provided criteria"),
+			"Cannot find a team according to the provided criteria",
 		)
 		return
 	}
@@ -173,13 +173,13 @@ func (d *teamDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		d.roleTeams.GetLinksByObject(team.TeamUid(), func(rt enterprise.IRoleTeam) bool {
 			var r = d.roles.GetEntity(rt.RoleId())
 			if r != nil {
-				var rsm = new(roleShortModel)
+				var rsm = new(model.RoleShortModel)
 				var isAdmin bool
 				d.managedNodes.GetLinksBySubject(rt.RoleId(), func(_ enterprise.IManagedNode) bool {
 					isAdmin = true
 					return false
 				})
-				rsm.fromKeeper(r, isAdmin)
+				rsm.FromKeeper(r, isAdmin)
 				state.Roles = append(state.Roles, rsm)
 			}
 			return true

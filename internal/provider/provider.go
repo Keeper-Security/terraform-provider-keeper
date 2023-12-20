@@ -10,16 +10,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/api"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/auth"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/helpers"
+	"github.com/keeper-security/keeper-sdk-golang/api"
+	"github.com/keeper-security/keeper-sdk-golang/auth"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"os"
 	"strings"
-	"terraform-provider-kepr/internal/model"
-	"terraform-provider-kepr/internal/test"
+	"terraform-provider-keeper/internal/model"
+	"terraform-provider-keeper/internal/test"
 )
 
 // Ensure KeeperEnterpriseProvider satisfies various provider interfaces.
@@ -48,7 +47,7 @@ type keeperEnterpriseProviderModel struct {
 }
 
 func (p *keeperEnterpriseProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "kepr"
+	resp.TypeName = "keeper"
 	resp.Version = p.version
 }
 
@@ -95,20 +94,7 @@ func (p *keeperEnterpriseProvider) Configure(ctx context.Context, req provider.C
 	}
 
 	if p.management == nil {
-		var core = zapcore.RegisterHooks(model.NewNopCore(), func(entry zapcore.Entry) error {
-			switch entry.Level {
-			case zapcore.DebugLevel:
-				tflog.Debug(ctx, entry.Message)
-			case zapcore.InfoLevel:
-				tflog.Info(ctx, entry.Message)
-			case zapcore.WarnLevel:
-				tflog.Warn(ctx, entry.Message)
-			case zapcore.ErrorLevel:
-				tflog.Error(ctx, entry.Message)
-			}
-			return nil
-		})
-
+		var core = model.NewTerraformCore(ctx, zapcore.DebugLevel)
 		var logger = zap.New(core)
 		api.SetLogger(logger)
 
@@ -149,9 +135,9 @@ func (p *keeperEnterpriseProvider) Configure(ctx context.Context, req provider.C
 			}
 			var configStorage auth.IConfigurationStorage
 			if isCommanderConfig {
-				configStorage = helpers.NewCommanderConfiguration(configFilename)
+				configStorage = auth.NewCommanderConfiguration(configFilename)
 			} else {
-				configStorage = helpers.NewJsonConfigurationFile(configFilename)
+				configStorage = auth.NewJsonConfigurationFile(configFilename)
 			}
 			var keeperConfig auth.IKeeperConfiguration
 			if keeperConfig, err = configStorage.Get(); err != nil {
@@ -161,8 +147,8 @@ func (p *keeperEnterpriseProvider) Configure(ctx context.Context, req provider.C
 					"The provider requires configuration file to connect to the Keeper backend.",
 				)
 			}
-			var keeperEndpoint = helpers.NewKeeperEndpoint(keeperConfig.LastServer(), configStorage)
-			var loginAuth = helpers.NewLoginAuth(keeperEndpoint)
+			var keeperEndpoint = auth.NewKeeperEndpoint(keeperConfig.LastServer(), configStorage)
+			var loginAuth = auth.NewLoginAuth(keeperEndpoint)
 			loginAuth.Login(keeperConfig.LastLogin())
 			var step = loginAuth.Step()
 			if step.LoginState() != auth.LoginState_Connected {
@@ -226,9 +212,9 @@ func (p *keeperEnterpriseProvider) Configure(ctx context.Context, req provider.C
 
 func (p *keeperEnterpriseProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		newTeamResource, newNodeResource,
+		newTeamResource, newNodeResource, newRoleResource,
 		newTeamMembershipResource, newRoleMembershipResource,
-		newManagedNodeResource,
+		newManagedNodeResource, newRoleEnforcementsResource,
 	}
 }
 
@@ -236,12 +222,12 @@ func (p *keeperEnterpriseProvider) DataSources(ctx context.Context) []func() dat
 	return []func() datasource.DataSource{
 		newNodeDataSource, newNodesDataSource,
 		newTeamDataSource, newTeamsDataSource,
-		NewRoleDataSource, NewRolesDataSource,
+		newRoleDataSource, newRolesDataSource,
 		newPrivilegeDataSource,
-		NewEnforcementsDataSource,NewEnforcementsAccountDataSource, NewEnforcementsLoginDataSource,
-		NewEnforcementsAllowIpListDataSource, NewEnforcementsPlatformDataSource, NewEnforcementsSharingDataSource,
-		NewEnforcements2faDataSource, NewEnforcementsKeeperFillDataSource, NewEnforcementsRecordTypesDataSource,
-		NewEnforcementsVaultDataSource,
+		newEnforcementsDataSource, newEnforcementsAccountDataSource, newEnforcementsLoginDataSource,
+		newEnforcementsAllowIpListDataSource, newEnforcementsPlatformDataSource, newEnforcementsSharingDataSource,
+		newEnforcements2faDataSource, newEnforcementsKeeperFillDataSource, newEnforcementsRecordTypesDataSource,
+		newEnforcementsVaultDataSource,
 		newUserDataSource, newUsersDataSource,
 	}
 }

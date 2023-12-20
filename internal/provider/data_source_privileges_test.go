@@ -12,25 +12,25 @@ func TestAccDataSourcePrivileges_Define(t *testing.T) {
 			{
 				Config: testConfigDataSourcePrivileges,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.kepr_privileges.test", "manage_nodes", "true"),
-					resource.TestCheckResourceAttr("data.kepr_privileges.test", "manage_users", "true"),
-					resource.TestCheckResourceAttr("data.kepr_privileges.test", "manage_roles", "false"),
-					resource.TestCheckResourceAttr("data.kepr_privileges.test", "manage_teams", "false"),
-					resource.TestCheckResourceAttr("data.kepr_privileges.test", "manage_reports", "true"),
-					resource.TestCheckResourceAttr("data.kepr_privileges.test", "manage_sso", "false"),
-					resource.TestCheckResourceAttr("data.kepr_privileges.test", "device_approval", "false"),
-					resource.TestCheckResourceAttr("data.kepr_privileges.test", "manage_record_types", "true"),
-					resource.TestCheckResourceAttr("data.kepr_privileges.test", "share_admin", "true"),
-					resource.TestCheckResourceAttr("data.kepr_privileges.test", "run_compliance_reports", "false"),
-					resource.TestCheckResourceAttr("data.kepr_privileges.test", "transfer_account", "false"),
-					resource.TestCheckResourceAttr("data.kepr_privileges.test", "manage_companies", "true"),
+					resource.TestCheckResourceAttr("data.keeper_privileges.test", "manage_nodes", "true"),
+					resource.TestCheckResourceAttr("data.keeper_privileges.test", "manage_users", "true"),
+					resource.TestCheckResourceAttr("data.keeper_privileges.test", "manage_roles", "false"),
+					resource.TestCheckResourceAttr("data.keeper_privileges.test", "manage_teams", "false"),
+					resource.TestCheckResourceAttr("data.keeper_privileges.test", "manage_reports", "true"),
+					resource.TestCheckResourceAttr("data.keeper_privileges.test", "manage_sso", "false"),
+					resource.TestCheckResourceAttr("data.keeper_privileges.test", "device_approval", "false"),
+					resource.TestCheckResourceAttr("data.keeper_privileges.test", "manage_record_types", "true"),
+					resource.TestCheckResourceAttr("data.keeper_privileges.test", "share_admin", "true"),
+					resource.TestCheckResourceAttr("data.keeper_privileges.test", "run_compliance_reports", "false"),
+					resource.TestCheckResourceAttr("data.keeper_privileges.test", "transfer_account", "false"),
+					resource.TestCheckResourceAttr("data.keeper_privileges.test", "manage_companies", "true"),
 				),
 			},
 		}})
 }
 
 const testConfigDataSourcePrivileges = `
-data "kepr_privileges" "test" {
+data "keeper_privileges" "test" {
   manage_nodes = true
   manage_users = true
   manage_roles = false

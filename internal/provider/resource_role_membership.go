@@ -9,8 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/api"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
+	"github.com/keeper-security/keeper-sdk-golang/api"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
 )
 
 func newRoleMembershipResource() resource.Resource {
@@ -99,6 +99,9 @@ func (rmr *roleMembershipResource) Read(ctx context.Context, req resource.ReadRe
 		return true
 	})
 	state.Users, diags = types.SetValue(types.Int64Type, members)
+	if resp.Diagnostics.Append(diags...); resp.Diagnostics.HasError() {
+		return
+	}
 
 	members = nil
 	rmr.management.EnterpriseData().RoleTeams().GetLinksBySubject(roleId, func(rt enterprise.IRoleTeam) bool {

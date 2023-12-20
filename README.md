@@ -1,1 +1,1 @@
-# terraform-provider-kepr
+# terraform-provider-keeper

@@ -6,11 +6,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/datasourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
 	"strings"
-	"terraform-provider-kepr/internal/model"
+	"terraform-provider-keeper/internal/model"
 )
 
 var (
@@ -18,44 +19,44 @@ var (
 )
 
 type roleDataSourceModel struct {
-	RoleId         types.Int64             `tfsdk:"role_id"`
-	Name           types.String            `tfsdk:"name"`
-	Node           *nodeShortModel         `tfsdk:"node"`
-	VisibleBelow   types.Bool              `tfsdk:"visible_below"`
-	NewUserInherit types.Bool              `tfsdk:"new_user_inherit"`
-	IsAdmin        types.Bool              `tfsdk:"is_admin"`
-	ManagedNodes   []*managedNodeModel     `tfsdk:"managed_nodes"`
-	IncludeMembers types.Bool              `tfsdk:"include_members"`
-	Users          []*model.UserShortModel `tfsdk:"users"`
-	Teams          []*model.TeamShortModel `tfsdk:"teams"`
-	Enforcements	*model.EnforcementsDataSourceModel		`tfsdk:"enforcements"`
+	RoleId         types.Int64                        `tfsdk:"role_id"`
+	Name           types.String                       `tfsdk:"name"`
+	Node           *model.NodeShortModel              `tfsdk:"node"`
+	VisibleBelow   types.Bool                         `tfsdk:"visible_below"`
+	NewUserInherit types.Bool                         `tfsdk:"new_user_inherit"`
+	IsAdmin        types.Bool                         `tfsdk:"is_admin"`
+	ManagedNodes   []*model.ManagedNodeModel          `tfsdk:"managed_nodes"`
+	IncludeMembers types.Bool                         `tfsdk:"include_members"`
+	Users          []*model.UserShortModel            `tfsdk:"users"`
+	Teams          []*model.TeamShortModel            `tfsdk:"teams"`
+	Enforcements   *model.EnforcementsDataSourceModel `tfsdk:"enforcements"`
 }
 
-func (model *roleDataSourceModel) fromKeeper(role enterprise.IRole, isAdmin bool, node enterprise.INode) {
-	model.RoleId = types.Int64Value(role.RoleId())
-	model.Name = types.StringValue(role.Name())
-	model.VisibleBelow = types.BoolValue(role.VisibleBelow())
-	model.NewUserInherit = types.BoolValue(role.NewUserInherit())
-	model.IsAdmin = types.BoolValue(isAdmin)
+func (rm *roleDataSourceModel) fromKeeper(role enterprise.IRole, isAdmin bool, node enterprise.INode) {
+	rm.RoleId = types.Int64Value(role.RoleId())
+	rm.Name = types.StringValue(role.Name())
+	rm.VisibleBelow = types.BoolValue(role.VisibleBelow())
+	rm.NewUserInherit = types.BoolValue(role.NewUserInherit())
+	rm.IsAdmin = types.BoolValue(isAdmin)
 	if node != nil {
-		model.Node = new(nodeShortModel)
-		model.Node.fromKeeper(node)
+		rm.Node = new(model.NodeShortModel)
+		rm.Node.FromKeeper(node)
 	}
 }
 
 type roleDataSource struct {
-	roles          enterprise.IEnterpriseEntity[enterprise.IRole, int64]
-	roleUsers      enterprise.IEnterpriseLink[enterprise.IRoleUser, int64, int64]
-	users          enterprise.IEnterpriseEntity[enterprise.IUser, int64]
-	nodes          enterprise.IEnterpriseEntity[enterprise.INode, int64]
-	managedNodes   enterprise.IEnterpriseLink[enterprise.IManagedNode, int64, int64]
-	rolePrivileges enterprise.IEnterpriseLink[enterprise.IRolePrivilege, int64, int64]
+	roles            enterprise.IEnterpriseEntity[enterprise.IRole, int64]
+	roleUsers        enterprise.IEnterpriseLink[enterprise.IRoleUser, int64, int64]
+	users            enterprise.IEnterpriseEntity[enterprise.IUser, int64]
+	nodes            enterprise.IEnterpriseEntity[enterprise.INode, int64]
+	managedNodes     enterprise.IEnterpriseLink[enterprise.IManagedNode, int64, int64]
+	rolePrivileges   enterprise.IEnterpriseLink[enterprise.IRolePrivilege, int64, int64]
 	roleEnforcements enterprise.IEnterpriseLink[enterprise.IRoleEnforcement, int64, string]
-	roleTeams      enterprise.IEnterpriseLink[enterprise.IRoleTeam, int64, string]
-	teams          enterprise.IEnterpriseEntity[enterprise.ITeam, string]
+	roleTeams        enterprise.IEnterpriseLink[enterprise.IRoleTeam, int64, string]
+	teams            enterprise.IEnterpriseEntity[enterprise.ITeam, string]
 }
 
-func NewRoleDataSource() datasource.DataSource {
+func newRoleDataSource() datasource.DataSource {
 	return &roleDataSource{}
 }
 func (d *roleDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -64,18 +65,25 @@ func (d *roleDataSource) Metadata(_ context.Context, req datasource.MetadataRequ
 
 // Schema defines the schema for the data source.
 func (d *roleDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	var diags diag.Diagnostics
+	var enforcementsAttributes map[string]schema.Attribute
+	enforcementsAttributes, diags = model.EnforcementsDataSourceAttributes()
+	resp.Diagnostics.Append(diags...)
+
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"role_id": schema.Int64Attribute{
 				Optional:    true,
+				Computed:    true,
 				Description: "Role ID",
 			},
 			"name": schema.StringAttribute{
 				Optional:    true,
+				Computed:    true,
 				Description: "Role Name",
 			},
 			"node": schema.SingleNestedAttribute{
-				Attributes:  nodeShortSchemaAttributes,
+				Attributes:  model.NodeShortSchemaAttributes,
 				Computed:    true,
 				Description: "Role Node",
 			},
@@ -110,13 +118,13 @@ func (d *roleDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			"managed_nodes": schema.ListNestedAttribute{
 				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
-					Attributes: managedNodeSchemaAttributes,
+					Attributes: model.ManagedNodeDataSourceSchemaAttributes,
 				},
 			},
 			"enforcements": schema.SingleNestedAttribute{
-				Optional:	true,
-				Description:"Role enforcemnts",
-				Attributes: enforcementsAttributes,
+				Optional:    true,
+				Description: "Role enforcemnts",
+				Attributes:  enforcementsAttributes,
 			},
 		},
 	}
@@ -166,7 +174,7 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	if m == nil {
 		resp.Diagnostics.AddError(
 			"Search criteria is not provided for \"role\" data source",
-			fmt.Sprintf("Search criteria is not provided for \"role\" data source"),
+			"Search criteria is not provided for \"role\" data source",
 		)
 		return
 	}
@@ -181,10 +189,7 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	})
 
 	if role == nil {
-		resp.Diagnostics.AddError(
-			"Role not found",
-			fmt.Sprintf("Cannot find a role according to the provided criteria"),
-		)
+		resp.Diagnostics.AddError("Role not found", "Cannot find a role according to the provided criteria")
 		return
 	}
 
@@ -197,7 +202,7 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	var node = d.nodes.GetEntity(role.NodeId())
 	state.fromKeeper(role, isAdmin, node)
 	d.managedNodes.GetLinksBySubject(role.RoleId(), func(mn enterprise.IManagedNode) bool {
-		var mnm = new(managedNodeModel)
+		var mnm = new(model.ManagedNodeModel)
 		mnm.NodeId = types.Int64Value(mn.ManagedNodeId())
 		var node = d.nodes.GetEntity(mn.ManagedNodeId())
 		if node != nil {
@@ -206,7 +211,7 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		mnm.CascadeNodeManagement = types.BoolValue(mn.CascadeNodeManagement())
 		var privileges = d.rolePrivileges.GetLink(mn.RoleId(), mn.ManagedNodeId())
 		if privileges != nil {
-			mnm.Privileges.FromKeeper(privileges.Privileges())
+			mnm.Privileges.FromKeeper(privileges)
 		}
 		state.ManagedNodes = append(state.ManagedNodes, mnm)
 		return true

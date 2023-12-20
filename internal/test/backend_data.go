@@ -2,17 +2,18 @@ package test
 
 import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
-	"terraform-provider-kepr/internal/model"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
+	"strconv"
+	"terraform-provider-keeper/internal/model"
 )
 
 var _ enterprise.IEnterpriseManagement = new(testingManagement)
 
 //
 //	Enterprise ID:    1234    (5299989643264 base enterprise ID)
-// 	Enterprise name:  Kepr TF
+// 	Enterprise name:  Keeper TF
 //
-// 	[Kepr TF]        (5299989643266)
+// 	[Keeper TF]      (5299989643266)
 //	 +-- [Subnode]   (5299989643274)
 //	 +-- Role(s)
 //	 |   +--Keeper Administrator (5299989643267)
@@ -65,11 +66,17 @@ func NewTestingManagement() enterprise.IEnterpriseManagement {
 	ra.SetKeyType("encrypted_by_data_key")
 	lm.roles[ra.RoleId()] = ra
 
+	var re = enterprise.NewRoleEnforcement(ra.RoleId(), "master_password_minimum_length")
+	re.SetValue(strconv.Itoa(20))
+	lm.roleEnforcements.addLink(re)
+	re = enterprise.NewRoleEnforcement(ra.RoleId(), "restrict_email_change")
+	re.SetValue("true")
+	lm.roleEnforcements.addLink(re)
+
 	var mn = enterprise.NewManagedNode(ra.RoleId(), rn.NodeId())
 	mn.SetCascadeNodeManagement(true)
 	lm.managedNodes.addLink(mn)
 
-	var np = enterprise.NewRolePrivilege(mn.RoleId(), mn.ManagedNodeId())
 	var pds = &model.PrivilegeDataSourceModel{
 		ManageNodes:          types.BoolValue(true),
 		ManageUsers:          types.BoolValue(true),
@@ -84,9 +91,8 @@ func NewTestingManagement() enterprise.IEnterpriseManagement {
 		ManageCompanies:      types.BoolValue(true),
 		TransferAccount:      types.BoolValue(false),
 	}
-	for _, p := range pds.ToKeeper() {
-		np.SetPrivilege(p)
-	}
+	var np = enterprise.NewRolePrivilege(mn.RoleId(), mn.ManagedNodeId())
+	pds.ToKeeper(np)
 	lm.rolePrivileges.addLink(np)
 
 	var teamUid = "MWaZlKLGNa585bX6sCui3g"

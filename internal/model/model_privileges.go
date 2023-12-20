@@ -1,9 +1,9 @@
 package model
 
 import (
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/api"
-	"strings"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
 )
 
 type PrivilegeDataSourceModel struct {
@@ -21,59 +21,121 @@ type PrivilegeDataSourceModel struct {
 	ManageCompanies      types.Bool `tfsdk:"manage_companies"`
 }
 
-func (model *PrivilegeDataSourceModel) FromKeeper(privileges []string) {
-	var s = api.NewSet[string]()
-	s.Union(api.SliceSelect(privileges, func(x string) string { return strings.ToLower(x) }))
-	model.ManageNodes = types.BoolValue(s.Has("manage_nodes"))
-	model.ManageUsers = types.BoolValue(s.Has("manage_user"))
-	model.ManageRoles = types.BoolValue(s.Has("manage_roles"))
-	model.ManageTeams = types.BoolValue(s.Has("manage_teams"))
-	model.ManageReports = types.BoolValue(s.Has("run_reports"))
-	model.ManageSso = types.BoolValue(s.Has("manage_bridge"))
-	model.DeviceApproval = types.BoolValue(s.Has("approve_device"))
-	model.ManageRecordTypes = types.BoolValue(s.Has("manage_record_types"))
-	model.ShareAdmin = types.BoolValue(s.Has("sharing_administrator"))
-	model.RunComplianceReports = types.BoolValue(s.Has("run_compliance_reports"))
-	model.TransferAccount = types.BoolValue(s.Has("transfer_account"))
-	model.ManageCompanies = types.BoolValue(s.Has("manage_companies"))
+func (pds *PrivilegeDataSourceModel) FromKeeper(rp enterprise.IRolePrivilege) {
+	pds.ManageNodes = types.BoolValue(rp.ManageNodes())
+	pds.ManageUsers = types.BoolValue(rp.ManageUsers())
+	pds.ManageRoles = types.BoolValue(rp.ManageRoles())
+	pds.ManageTeams = types.BoolValue(rp.ManageTeams())
+	pds.ManageReports = types.BoolValue(rp.RunReports())
+	pds.ManageSso = types.BoolValue(rp.ManageBridge())
+	pds.DeviceApproval = types.BoolValue(rp.ApproveDevices())
+	pds.ManageRecordTypes = types.BoolValue(rp.ManageRecordTypes())
+	pds.ShareAdmin = types.BoolValue(rp.SharingAdministrator())
+	pds.RunComplianceReports = types.BoolValue(rp.RunComplianceReport())
+	pds.TransferAccount = types.BoolValue(rp.TransferAccount())
+	pds.ManageCompanies = types.BoolValue(rp.ManageCompanies())
 }
 
-func (model *PrivilegeDataSourceModel) ToKeeper() (privileges []string) {
-	if !model.ManageNodes.IsNull() && model.ManageNodes.ValueBool() {
-		privileges = append(privileges, "manage_nodes")
+func (pds *PrivilegeDataSourceModel) ToKeeper(result enterprise.IRolePrivilegeEdit) {
+	if !pds.ManageNodes.IsNull() {
+		result.SetManageNodes(pds.ManageNodes.ValueBool())
 	}
-	if !model.ManageUsers.IsNull() && model.ManageUsers.ValueBool() {
-		privileges = append(privileges, "manage_user")
+	if !pds.ManageUsers.IsNull() {
+		result.SetManageUsers(pds.ManageUsers.ValueBool())
 	}
-	if !model.ManageRoles.IsNull() && model.ManageRoles.ValueBool() {
-		privileges = append(privileges, "manage_roles")
+	if !pds.ManageRoles.IsNull() {
+		result.SetManageRoles(pds.ManageRoles.ValueBool())
 	}
-	if !model.ManageTeams.IsNull() && model.ManageTeams.ValueBool() {
-		privileges = append(privileges, "manage_teams")
+	if !pds.ManageTeams.IsNull() {
+		result.SetManageTeams(pds.ManageTeams.ValueBool())
 	}
-	if !model.ManageReports.IsNull() && model.ManageReports.ValueBool() {
-		privileges = append(privileges, "run_reports")
+	if !pds.ManageReports.IsNull() {
+		result.SetRunReports(pds.ManageReports.ValueBool())
 	}
-	if !model.ManageSso.IsNull() && model.ManageSso.ValueBool() {
-		privileges = append(privileges, "manage_bridge")
+	if !pds.ManageSso.IsNull() {
+		result.SetManageBridge(pds.ManageSso.ValueBool())
 	}
-	if !model.DeviceApproval.IsNull() && model.DeviceApproval.ValueBool() {
-		privileges = append(privileges, "approve_device")
+	if !pds.DeviceApproval.IsNull() {
+		result.SetApproveDevices(pds.DeviceApproval.ValueBool())
 	}
-	if !model.ManageRecordTypes.IsNull() && model.ManageRecordTypes.ValueBool() {
-		privileges = append(privileges, "manage_record_types")
+	if !pds.ManageRecordTypes.IsNull() {
+		result.SetManageRecordTypes(pds.ManageRecordTypes.ValueBool())
 	}
-	if !model.ShareAdmin.IsNull() && model.ShareAdmin.ValueBool() {
-		privileges = append(privileges, "sharing_administrator")
+	if !pds.ShareAdmin.IsNull() {
+		result.SetSharingAdministrator(pds.ShareAdmin.ValueBool())
 	}
-	if !model.RunComplianceReports.IsNull() && model.RunComplianceReports.ValueBool() {
-		privileges = append(privileges, "run_compliance_reports")
+	if !pds.RunComplianceReports.IsNull() {
+		result.SetRunComplianceReport(pds.RunComplianceReports.ValueBool())
 	}
-	if !model.TransferAccount.IsNull() && model.TransferAccount.ValueBool() {
-		privileges = append(privileges, "transfer_account")
+	if !pds.TransferAccount.IsNull() {
+		result.SetTransferAccount(pds.TransferAccount.ValueBool())
 	}
-	if !model.ManageCompanies.IsNull() && model.ManageCompanies.ValueBool() {
-		privileges = append(privileges, "manage_companies")
+	if !pds.ManageCompanies.IsNull() {
+		result.SetManageCompanies(pds.ManageCompanies.ValueBool())
 	}
-	return
+}
+
+var PrivilegesDataSourceAttributes = map[string]schema.Attribute{
+	"manage_nodes": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Manage Nodes",
+	},
+	"manage_users": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Manage Users",
+	},
+	"manage_teams": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Manage Teams",
+	},
+	"manage_roles": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Manage Roles",
+	},
+	"manage_reports": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Manage Reporting and Alerts",
+	},
+	"manage_sso": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Manage Bridge/SSO",
+	},
+	"device_approval": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Perform Device Approvals",
+	},
+	"manage_record_types": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Manage Record Types in Vault",
+		MarkdownDescription: "This permission allows the admin rights to create, edit, or delete Record Types " +
+			"which have pre-defined fields. Record Types appear during creation of records in the user's vault.",
+	},
+	"share_admin": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Share Admin",
+	},
+	"run_compliance_reports": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Run Compliance Reports",
+	},
+	"transfer_account": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Transfer Account",
+	},
+	"manage_companies": schema.BoolAttribute{
+		Optional:    true,
+		Computed:    true,
+		Description: "Manage Companies",
+	},
 }

@@ -2,7 +2,7 @@ package provider
 
 import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"terraform-provider-kepr/internal/model"
+	"terraform-provider-keeper/internal/model"
 	"testing"
 )
 
@@ -13,9 +13,9 @@ func TestAccTeamMembershipResource_Create(t *testing.T) {
 			{
 				Config: testAccAllActiveToEveryone,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("kepr_team_membership.everyone", "team_uid", "MWaZlKLGNa585bX6sCui3g"),
-					resource.TestCheckResourceAttr("kepr_team_membership.everyone", "users.#", "1"),
-					resource.TestCheckTypeSetElemAttr("kepr_team_membership.everyone", "users.*", "5299989643284"),
+					resource.TestCheckResourceAttr("keeper_team_membership.everyone", "team_uid", "MWaZlKLGNa585bX6sCui3g"),
+					resource.TestCheckResourceAttr("keeper_team_membership.everyone", "users.#", "1"),
+					resource.TestCheckTypeSetElemAttr("keeper_team_membership.everyone", "users.*", "5299989643284"),
 				),
 			},
 		},
@@ -23,17 +23,17 @@ func TestAccTeamMembershipResource_Create(t *testing.T) {
 }
 
 const testAccAllActiveToEveryone = `
-data "kepr_team" "everyone" {
+data "keeper_team" "everyone" {
 	team_uid = "MWaZlKLGNa585bX6sCui3g"
 }
 
-data "kepr_users" "active_users" {
+data "keeper_users" "active_users" {
 	is_active = true
 }
 
-resource "kepr_team_membership" "everyone" {
-  team_uid = data.kepr_team.everyone.team_uid
-  users = data.kepr_users.active_users.users[*].enterprise_user_id
+resource "keeper_team_membership" "everyone" {
+  team_uid = data.keeper_team.everyone.team_uid
+  users = data.keeper_users.active_users.users[*].enterprise_user_id
 }
 `
 
@@ -46,7 +46,7 @@ func TestAccTeamMembershipResource_Import(t *testing.T) {
 			{
 				Config:        testAccImportEveryone,
 				ImportState:   true,
-				ResourceName:  "kepr_team_membership.everyone",
+				ResourceName:  "keeper_team_membership.everyone",
 				ImportStateId: teamUid,
 				ImportStateCheck: model.ComposeAggregateImportStateCheckFunc(
 					model.TestCheckImportStateAttr("team_uid", "MWaZlKLGNa585bX6sCui3g"),
@@ -58,12 +58,12 @@ func TestAccTeamMembershipResource_Import(t *testing.T) {
 }
 
 const testAccImportEveryone = `
-data "kepr_team" "everyone" {
+data "keeper_team" "everyone" {
 	team_uid = "MWaZlKLGNa585bX6sCui3g"
 }
 
-resource "kepr_team_membership" "everyone" {
-  team_uid = data.kepr_team.everyone.team_uid
+resource "keeper_team_membership" "everyone" {
+  team_uid = data.keeper_team.everyone.team_uid
   users = [5299989643285]
 }
 `

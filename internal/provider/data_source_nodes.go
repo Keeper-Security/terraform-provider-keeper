@@ -9,9 +9,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
 	"reflect"
-	"terraform-provider-kepr/internal/model"
+	"terraform-provider-keeper/internal/model"
 )
 
 var (
@@ -31,7 +31,7 @@ type subNodesCriteria struct {
 type nodesDataSourceModel struct {
 	Filter          *model.FilterCriteria `tfsdk:"filter"`
 	SubNodeCriteria *subNodesCriteria     `tfsdk:"subnodes"`
-	Nodes           []*nodeModel          `tfsdk:"nodes"`
+	Nodes           []*model.NodeModel    `tfsdk:"nodes"`
 }
 
 type nodesDataSource struct {
@@ -70,7 +70,7 @@ func (d *nodesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 			"nodes": schema.ListNestedAttribute{
 				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
-					Attributes: nodeSchemaAttributes,
+					Attributes: model.NodeSchemaAttributes,
 				},
 			},
 		},
@@ -86,7 +86,7 @@ func (d *nodesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	}
 
 	var state = nq
-
+	state.Nodes = make([]*model.NodeModel, 0)
 	if nq.SubNodeCriteria != nil {
 		var nodes []enterprise.INode
 		var nodeId int64
@@ -129,20 +129,20 @@ func (d *nodesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			}
 		}
 		for _, n := range nodes {
-			var nm = new(nodeModel)
-			nm.fromKeeper(n)
+			var nm = new(model.NodeModel)
+			nm.FromKeeper(n)
 			state.Nodes = append(state.Nodes, nm)
 		}
 	} else if nq.Filter != nil {
 		var cb model.Matcher
-		cb, diags = model.GetFieldMatcher(nq.Filter, reflect.TypeOf((*nodeModel)(nil)))
+		cb, diags = model.GetFieldMatcher(nq.Filter, reflect.TypeOf((*model.NodeModel)(nil)))
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
 		d.nodes.GetAllEntities(func(n enterprise.INode) bool {
-			var nm = new(nodeModel)
-			nm.fromKeeper(n)
+			var nm = new(model.NodeModel)
+			nm.FromKeeper(n)
 			if cb(nm) {
 				state.Nodes = append(state.Nodes, nm)
 			}

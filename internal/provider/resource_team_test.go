@@ -2,7 +2,7 @@ package provider
 
 import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"terraform-provider-kepr/internal/model"
+	"terraform-provider-keeper/internal/model"
 	"testing"
 )
 
@@ -14,9 +14,9 @@ func TestAccTeamResource_Create(t *testing.T) {
 			{
 				Config: testConfigTeamCreate,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("kepr_team.Readers", "name", "SSO Team"),
-					resource.TestCheckResourceAttr("kepr_team.Readers", "node_id", "5299989643266"),
-					resource.TestCheckResourceAttr("kepr_team.Readers", "restrict_edit", "true"),
+					resource.TestCheckResourceAttr("keeper_team.Readers", "name", "SSO Team"),
+					resource.TestCheckResourceAttr("keeper_team.Readers", "node_id", "5299989643266"),
+					resource.TestCheckResourceAttr("keeper_team.Readers", "restrict_edit", "true"),
 				),
 			},
 		},
@@ -24,12 +24,12 @@ func TestAccTeamResource_Create(t *testing.T) {
 }
 
 const testConfigTeamCreate = `
-data "kepr_node" "root" {
+data "keeper_node" "root" {
 	is_root = true
 }
-resource "kepr_team" "Readers" {
+resource "keeper_team" "Readers" {
 	name = "SSO Team"
-	node_id = data.kepr_node.root.node_id
+	node_id = data.keeper_node.root.node_id
 	restrict_edit = true
 	restrict_share = true
 }
@@ -43,7 +43,7 @@ func TestAccTeamResource_Import(t *testing.T) {
 			{
 				Config:        testConfigTeamImport,
 				ImportState:   true,
-				ResourceName:  "kepr_team.all_users",
+				ResourceName:  "keeper_team.all_users",
 				ImportStateId: "MWaZlKLGNa585bX6sCui3g",
 				ImportStateCheck: model.ComposeAggregateImportStateCheckFunc(
 					model.TestCheckImportStateAttr("team_uid", "MWaZlKLGNa585bX6sCui3g"),
@@ -56,7 +56,7 @@ func TestAccTeamResource_Import(t *testing.T) {
 			{
 				Config: testConfigTeamImport,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("kepr_team.all_users", "name", "Anyone"),
+					resource.TestCheckResourceAttr("keeper_team.all_users", "name", "Anyone"),
 				),
 			},
 		},
@@ -64,7 +64,7 @@ func TestAccTeamResource_Import(t *testing.T) {
 }
 
 const testConfigTeamImport = `
-resource "kepr_team" "all_users" {
+resource "keeper_team" "all_users" {
 	name = "Anyone"
 }
 `

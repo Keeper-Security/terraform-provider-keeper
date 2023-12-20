@@ -8,9 +8,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
 	"strings"
-	"terraform-provider-kepr/internal/model"
+	"terraform-provider-keeper/internal/model"
 )
 
 var (
@@ -33,7 +33,7 @@ type userDataSourceModel struct {
 	IncludeTeams           types.Bool              `tfsdk:"include_teams"`
 	Teams                  []*model.TeamShortModel `tfsdk:"teams"`
 	IncludeRoles           types.Bool              `tfsdk:"include_roles"`
-	Roles                  []*roleShortModel       `tfsdk:"roles"`
+	Roles                  []*model.RoleShortModel `tfsdk:"roles"`
 }
 
 func (uds *userDataSourceModel) fromKeeper(keeper enterprise.IUser) {
@@ -106,7 +106,7 @@ func (d *userDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 		"roles": schema.ListNestedAttribute{
 			Computed: true,
 			NestedObject: schema.NestedAttributeObject{
-				Attributes: roleShortSchemaAttributes,
+				Attributes: model.RoleShortSchemaAttributes,
 			},
 		},
 	}
@@ -159,7 +159,7 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	if userMatcher == nil {
 		resp.Diagnostics.AddError(
 			"Search criteria is not provided for \"user\" data source",
-			fmt.Sprintf("Search criteria is not provided for \"%s\" data source", "kepr_user"),
+			fmt.Sprintf("Search criteria is not provided for \"%s\" data source", "keeper_user"),
 		)
 		return
 	}
@@ -176,7 +176,7 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	if user == nil {
 		resp.Diagnostics.AddError(
 			"User not found",
-			fmt.Sprintf("Cannot find a user according to the provided criteria"),
+			"Cannot find a user according to the provided criteria",
 		)
 		return
 	}
@@ -200,13 +200,13 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		d.roleUsers.GetLinksByObject(user.EnterpriseUserId(), func(ru enterprise.IRoleUser) bool {
 			var r = d.roles.GetEntity(ru.RoleId())
 			if r != nil {
-				var rsm = new(roleShortModel)
+				var rsm = new(model.RoleShortModel)
 				var isAdmin bool
 				d.managedNodes.GetLinksBySubject(ru.RoleId(), func(_ enterprise.IManagedNode) bool {
 					isAdmin = true
 					return false
 				})
-				rsm.fromKeeper(r, isAdmin)
+				rsm.FromKeeper(r, isAdmin)
 				state.Roles = append(state.Roles, rsm)
 			}
 			return true

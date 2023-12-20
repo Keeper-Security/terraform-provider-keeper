@@ -8,9 +8,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
 	"strings"
-	"terraform-provider-kepr/internal/model"
+	"terraform-provider-keeper/internal/model"
 )
 
 var (
@@ -22,51 +22,51 @@ func newNodeDataSource() datasource.DataSource {
 }
 
 type nodeDataSourceModel struct {
-	NodeId             types.Int64            `tfsdk:"node_id"`
-	Name               types.String           `tfsdk:"name"`
-	ParentId           types.Int64            `tfsdk:"parent_id"`
-	Bridge             *bridgeShortModel      `tfsdk:"bridge"`
-	Scim               *scimShortModel        `tfsdk:"scim"`
-	DuoEnabled         types.Bool             `tfsdk:"duo_enabled"`
-	RsaEnabled         types.Bool             `tfsdk:"rsa_enabled"`
-	RestrictVisibility types.Bool             `tfsdk:"restrict_visibility"`
-	SsoOnPremise       *ssoProviderShortModel `tfsdk:"sso_provider_on_premise"`
-	SsoInCloud         *ssoProviderShortModel `tfsdk:"sso_provider_in_cloud"`
-	IsRoot             types.Bool             `tfsdk:"is_root"`
+	NodeId             types.Int64                  `tfsdk:"node_id"`
+	Name               types.String                 `tfsdk:"name"`
+	ParentId           types.Int64                  `tfsdk:"parent_id"`
+	Bridge             *model.BridgeShortModel      `tfsdk:"bridge"`
+	Scim               *model.ScimShortModel        `tfsdk:"scim"`
+	DuoEnabled         types.Bool                   `tfsdk:"duo_enabled"`
+	RsaEnabled         types.Bool                   `tfsdk:"rsa_enabled"`
+	RestrictVisibility types.Bool                   `tfsdk:"restrict_visibility"`
+	SsoOnPremise       *model.SsoProviderShortModel `tfsdk:"sso_provider_on_premise"`
+	SsoInCloud         *model.SsoProviderShortModel `tfsdk:"sso_provider_in_cloud"`
+	IsRoot             types.Bool                   `tfsdk:"is_root"`
 }
 
-func (model *nodeDataSourceModel) fromKeeper(node enterprise.INode) {
-	model.NodeId = types.Int64Value(node.NodeId())
-	model.Name = types.StringValue(node.Name())
-	model.DuoEnabled = types.BoolValue(node.DuoEnabled())
-	model.RsaEnabled = types.BoolValue(node.RsaEnabled())
+func (nds *nodeDataSourceModel) fromKeeper(node enterprise.INode) {
+	nds.NodeId = types.Int64Value(node.NodeId())
+	nds.Name = types.StringValue(node.Name())
+	nds.DuoEnabled = types.BoolValue(node.DuoEnabled())
+	nds.RsaEnabled = types.BoolValue(node.RsaEnabled())
 	if node.ParentId() > 0 {
-		model.ParentId = types.Int64Value(node.ParentId())
+		nds.ParentId = types.Int64Value(node.ParentId())
 	}
 	if node.RestrictVisibility() {
-		model.RestrictVisibility = types.BoolValue(true)
+		nds.RestrictVisibility = types.BoolValue(true)
 	}
 }
 
-func (model *nodeDataSourceModel) loadScimData(scim enterprise.IScim) {
-	var sm = new(scimShortModel)
-	sm.fromKeeper(scim)
-	model.Scim = sm
+func (nds *nodeDataSourceModel) loadScimData(scim enterprise.IScim) {
+	var sm = new(model.ScimShortModel)
+	sm.FromKeeper(scim)
+	nds.Scim = sm
 }
 
-func (model *nodeDataSourceModel) loadBridgeData(bridge enterprise.IBridge) {
-	var bm = new(bridgeShortModel)
-	bm.fromKeeper(bridge)
-	model.Bridge = bm
+func (nds *nodeDataSourceModel) loadBridgeData(bridge enterprise.IBridge) {
+	var bm = new(model.BridgeShortModel)
+	bm.FromKeeper(bridge)
+	nds.Bridge = bm
 }
 
-func (model *nodeDataSourceModel) loadSsoServiceData(service enterprise.ISsoService) {
-	var sm = new(ssoProviderShortModel)
-	sm.fromKeeper(service)
+func (nds *nodeDataSourceModel) loadSsoServiceData(service enterprise.ISsoService) {
+	var sm = new(model.SsoProviderShortModel)
+	sm.FromKeeper(service)
 	if service.IsCloud() {
-		model.SsoOnPremise = sm
+		nds.SsoOnPremise = sm
 	} else {
-		model.SsoInCloud = sm
+		nds.SsoInCloud = sm
 	}
 }
 
@@ -107,7 +107,7 @@ func (d *nodeDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 		},
 	}
 	resp.Schema = schema.Schema{
-		Attributes: model.MergeMaps(filterAttributes, nodeDetailedSchemaAttributes),
+		Attributes: model.MergeMaps(filterAttributes, model.NodeDetailedSchemaAttributes),
 	}
 }
 
@@ -140,7 +140,7 @@ func (d *nodeDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	if node == nil && m == nil {
 		resp.Diagnostics.AddError(
 			"Search criteria is not provided for \"node\" data source",
-			fmt.Sprintf("Search criteria is not provided for \"node\" data source"),
+			"Search criteria is not provided for \"node\" data source",
 		)
 		return
 	}
@@ -157,7 +157,7 @@ func (d *nodeDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	if node == nil {
 		resp.Diagnostics.AddError(
 			"Node not found",
-			fmt.Sprintf("Cannot find a node according to the provided criteria"),
+			"Cannot find a node according to the provided criteria",
 		)
 		return
 	}
