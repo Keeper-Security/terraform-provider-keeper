@@ -1,13 +1,12 @@
-package provider
+package model
 
 import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
-	"terraform-provider-kepr/internal/model"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
 )
 
-type roleModel struct {
+type RoleModel struct {
 	RoleId         types.Int64  `tfsdk:"role_id"`
 	Name           types.String `tfsdk:"name"`
 	NodeId         types.Int64  `tfsdk:"node_id"`
@@ -16,16 +15,16 @@ type roleModel struct {
 	IsAdmin        types.Bool   `tfsdk:"is_admin"`
 }
 
-func (model *roleModel) fromKeeper(role enterprise.IRole, isAdmin bool) {
-	model.RoleId = types.Int64Value(role.RoleId())
-	model.Name = types.StringValue(role.Name())
-	model.NodeId = types.Int64Value(role.NodeId())
-	model.VisibleBelow = types.BoolValue(role.VisibleBelow())
-	model.NewUserInherit = types.BoolValue(role.NewUserInherit())
-	model.IsAdmin = types.BoolValue(isAdmin)
+func (rm *RoleModel) FromKeeper(role enterprise.IRole, isAdmin bool) {
+	rm.RoleId = types.Int64Value(role.RoleId())
+	rm.Name = types.StringValue(role.Name())
+	rm.NodeId = types.Int64Value(role.NodeId())
+	rm.VisibleBelow = types.BoolValue(role.VisibleBelow())
+	rm.NewUserInherit = types.BoolValue(role.NewUserInherit())
+	rm.IsAdmin = types.BoolValue(isAdmin)
 }
 
-var roleSchemaAttributes = map[string]schema.Attribute{
+var RoleSchemaAttributes = map[string]schema.Attribute{
 	"role_id": schema.Int64Attribute{
 		Computed:    true,
 		Description: "Role ID",
@@ -52,14 +51,14 @@ var roleSchemaAttributes = map[string]schema.Attribute{
 	},
 }
 
-type managedNodeModel struct {
-	NodeId                types.Int64                    `tfsdk:"node_id"`
-	Name                  types.String                   `tfsdk:"name"`
-	CascadeNodeManagement types.Bool                     `tfsdk:"cascade_node_management"`
-	Privileges            model.PrivilegeDataSourceModel `tfsdk:"privileges"`
+type ManagedNodeModel struct {
+	NodeId                types.Int64              `tfsdk:"node_id"`
+	Name                  types.String             `tfsdk:"name"`
+	CascadeNodeManagement types.Bool               `tfsdk:"cascade_node_management"`
+	Privileges            PrivilegeDataSourceModel `tfsdk:"privileges"`
 }
 
-var managedNodeSchemaAttributes = map[string]schema.Attribute{
+var ManagedNodeDataSourceSchemaAttributes = map[string]schema.Attribute{
 	"node_id": schema.Int64Attribute{
 		Computed:    true,
 		Description: "Managed Node ID",
@@ -73,27 +72,27 @@ var managedNodeSchemaAttributes = map[string]schema.Attribute{
 		Description: "Cascade Node Management",
 	},
 	"privileges": schema.SingleNestedAttribute{
-		Attributes:  privilegesAttributes,
+		Attributes:  PrivilegesDataSourceAttributes,
 		Optional:    true,
 		Description: "Privileges",
 	},
 }
 
-type roleShortModel struct {
+type RoleShortModel struct {
 	RoleId  types.Int64  `tfsdk:"role_id"`
 	Name    types.String `tfsdk:"name"`
 	NodeId  types.Int64  `tfsdk:"node_id"`
 	IsAdmin types.Bool   `tfsdk:"is_admin"`
 }
 
-func (model *roleShortModel) fromKeeper(role enterprise.IRole, isAdmin bool) {
-	model.RoleId = types.Int64Value(role.RoleId())
-	model.Name = types.StringValue(role.Name())
-	model.NodeId = types.Int64Value(role.NodeId())
-	model.IsAdmin = types.BoolValue(isAdmin)
+func (rsm *RoleShortModel) FromKeeper(role enterprise.IRole, isAdmin bool) {
+	rsm.RoleId = types.Int64Value(role.RoleId())
+	rsm.Name = types.StringValue(role.Name())
+	rsm.NodeId = types.Int64Value(role.NodeId())
+	rsm.IsAdmin = types.BoolValue(isAdmin)
 }
 
-var roleShortSchemaAttributes = map[string]schema.Attribute{
+var RoleShortSchemaAttributes = map[string]schema.Attribute{
 	"role_id": schema.Int64Attribute{
 		Computed:    true,
 		Description: "Role ID",

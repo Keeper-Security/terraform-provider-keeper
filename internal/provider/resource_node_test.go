@@ -2,7 +2,7 @@ package provider
 
 import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"terraform-provider-kepr/internal/model"
+	"terraform-provider-keeper/internal/model"
 	"testing"
 )
 
@@ -14,8 +14,8 @@ func TestAccNodeResource_Create(t *testing.T) {
 			{
 				Config: testConfigNodeCreate,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("kepr_node.SSO", "name", "SSO"),
-					resource.TestCheckResourceAttr("kepr_node.SSO", "restrict_visibility", "true"),
+					resource.TestCheckResourceAttr("keeper_node.SSO", "name", "SSO"),
+					resource.TestCheckResourceAttr("keeper_node.SSO", "restrict_visibility", "true"),
 				),
 			},
 		},
@@ -23,12 +23,12 @@ func TestAccNodeResource_Create(t *testing.T) {
 }
 
 const testConfigNodeCreate = `
-data "kepr_node" "root" {
+data "keeper_node" "root" {
 	is_root = true
 }
-resource "kepr_node" "SSO" {
+resource "keeper_node" "SSO" {
 	name = "SSO"
-	parent_id = data.kepr_node.root.node_id
+	parent_id = data.keeper_node.root.node_id
 	restrict_visibility = true
 }
 `
@@ -41,7 +41,7 @@ func TestAccNodeResource_Import(t *testing.T) {
 			{
 				Config:        testConfigNodeImport,
 				ImportState:   true,
-				ResourceName:  "kepr_node.subnode",
+				ResourceName:  "keeper_node.subnode",
 				ImportStateId: "5299989643274",
 				ImportStateCheck: model.ComposeAggregateImportStateCheckFunc(
 					model.TestCheckImportStateAttr("parent_id", "5299989643266"),
@@ -54,7 +54,7 @@ func TestAccNodeResource_Import(t *testing.T) {
 			{
 				Config: testConfigNodeImport,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("kepr_node.subnode", "name", "Subnodes"),
+					resource.TestCheckResourceAttr("keeper_node.subnode", "name", "Subnodes"),
 				),
 			},
 		},
@@ -62,7 +62,7 @@ func TestAccNodeResource_Import(t *testing.T) {
 }
 
 const testConfigNodeImport = `
-resource "kepr_node" "subnode" {
+resource "keeper_node" "subnode" {
 	name = "Subnodes"
 }
 `

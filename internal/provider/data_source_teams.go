@@ -7,9 +7,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
 	"reflect"
-	"terraform-provider-kepr/internal/model"
+	"terraform-provider-keeper/internal/model"
 )
 
 var (
@@ -82,6 +82,7 @@ func (d *teamsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	}
 
 	var state = tq
+	state.Teams = make([]*model.TeamModel, 0)
 	d.teams.GetAllEntities(func(t enterprise.ITeam) bool {
 		if nm != nil {
 			if !nm(t.NodeId()) {

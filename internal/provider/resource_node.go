@@ -10,10 +10,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
 	"strconv"
 	"strings"
-	"terraform-provider-kepr/internal/model"
 )
 
 func newNodeResource() resource.Resource {
@@ -46,29 +45,6 @@ func (model *nodeResourceModel) toKeeper(node enterprise.INodeEdit) {
 	}
 }
 
-var nodeResourceSchemaAttributes = map[string]schema.Attribute{
-	"node_id": schema.Int64Attribute{
-		Computed:      true,
-		Description:   "Node ID",
-		PlanModifiers: []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
-	},
-	"name": schema.StringAttribute{
-		Required:    true,
-		Description: "Node Name",
-	},
-	"parent_id": schema.Int64Attribute{
-		Optional:    true,
-		Computed:    true,
-		Description: "Parent Node ID",
-	},
-	"restrict_visibility": schema.BoolAttribute{
-		Optional:    true,
-		Computed:    true,
-		Default:     booldefault.StaticBool(false),
-		Description: "Restrict Node Visibility",
-	},
-}
-
 type nodeResource struct {
 	management enterprise.IEnterpriseManagement
 }
@@ -79,7 +55,28 @@ func (nr *nodeResource) Metadata(_ context.Context, req resource.MetadataRequest
 
 func (nr *nodeResource) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Attributes: model.MergeMaps(nodeResourceSchemaAttributes),
+		Attributes: map[string]schema.Attribute{
+			"node_id": schema.Int64Attribute{
+				Computed:      true,
+				Description:   "Node ID",
+				PlanModifiers: []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
+			},
+			"name": schema.StringAttribute{
+				Required:    true,
+				Description: "Node Name",
+			},
+			"parent_id": schema.Int64Attribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "Parent Node ID",
+			},
+			"restrict_visibility": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+				Description: "Restrict Node Visibility",
+			},
+		},
 	}
 }
 

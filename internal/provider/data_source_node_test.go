@@ -12,23 +12,23 @@ func TestAccDataSourceNode_Read(t *testing.T) {
 			{
 				Config: testConfigNodeDataSource,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.kepr_node.root", "node_id", "5299989643266"),
-					resource.TestCheckResourceAttr("data.kepr_node.root", "name", "Kepr TF"),
-					resource.TestCheckResourceAttr("data.kepr_node.root", "is_root", "true"),
-					resource.TestCheckResourceAttr("data.kepr_node.subnode", "node_id", "5299989643274"),
-					resource.TestCheckResourceAttr("data.kepr_node.subnode", "parent_id", "5299989643266"),
-					resource.TestCheckResourceAttr("data.kepr_node.subnode", "name", "Subnode"),
+					resource.TestCheckResourceAttr("data.keeper_node.root", "node_id", "5299989643266"),
+					resource.TestCheckResourceAttr("data.keeper_node.root", "name", "Keeper TF"),
+					resource.TestCheckResourceAttr("data.keeper_node.root", "is_root", "true"),
+					resource.TestCheckResourceAttr("data.keeper_node.subnode", "node_id", "5299989643274"),
+					resource.TestCheckResourceAttr("data.keeper_node.subnode", "parent_id", "5299989643266"),
+					resource.TestCheckResourceAttr("data.keeper_node.subnode", "name", "Subnode"),
 				),
 			},
 		}})
 }
 
 const testConfigNodeDataSource = `
-data "kepr_node" "root" {
+data "keeper_node" "root" {
   is_root = true
 }
-data "kepr_node" "subnode" {
+data "keeper_node" "subnode" {
   name = "Subnode"
-  parent_id = data.kepr_node.root.node_id
+  parent_id = data.keeper_node.root.node_id
 }
 `

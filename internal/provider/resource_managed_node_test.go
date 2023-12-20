@@ -3,7 +3,7 @@ package provider
 import (
 	"fmt"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"terraform-provider-kepr/internal/model"
+	"terraform-provider-keeper/internal/model"
 	"testing"
 )
 
@@ -15,7 +15,7 @@ func TestAccManagedNodeResource_Create(t *testing.T) {
 			{
 				Config: testConfigManagedNodeCreate,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("kepr_managed_node.SSO", "role_id", "5299989643267"),
+					resource.TestCheckResourceAttr("keeper_managed_node.SSO", "role_id", "5299989643267"),
 				),
 			},
 		},
@@ -23,15 +23,15 @@ func TestAccManagedNodeResource_Create(t *testing.T) {
 }
 
 const testConfigManagedNodeCreate = `
-data "kepr_node" "root" {
+data "keeper_node" "root" {
 	is_root = true
 }
-resource "kepr_node" "SSO" {
+resource "keeper_node" "SSO" {
 	name = "SSO"
-	parent_id = data.kepr_node.root.node_id
+	parent_id = data.keeper_node.root.node_id
 	restrict_visibility = true
 }
-data "kepr_privileges" "full_admin" {
+data "keeper_privileges" "full_admin" {
   manage_nodes = true
   manage_users = true
   manage_roles = false
@@ -45,11 +45,11 @@ data "kepr_privileges" "full_admin" {
   transfer_account = false
   manage_companies = false
 }
-resource "kepr_managed_node" "SSO" {
+resource "keeper_managed_node" "SSO" {
     role_id = 5299989643267
-	node_id = resource.kepr_node.SSO.node_id
+	node_id = resource.keeper_node.SSO.node_id
     cascade_node_management = true
-    privileges = data.kepr_privileges.full_admin
+    privileges = data.keeper_privileges.full_admin
 }
 `
 
@@ -61,7 +61,7 @@ func TestAccManagedNodeResource_Import(t *testing.T) {
 			{
 				Config:        testConfigManagedNodeImport,
 				ImportState:   true,
-				ResourceName:  "kepr_managed_node.root_admin",
+				ResourceName:  "keeper_managed_node.root_admin",
 				ImportStateId: fmt.Sprintf("%d,%d", 5299989643267, 5299989643266),
 				ImportStateCheck: model.ComposeAggregateImportStateCheckFunc(
 					model.TestCheckImportStateAttr("role_id", "5299989643267"),
@@ -75,6 +75,6 @@ func TestAccManagedNodeResource_Import(t *testing.T) {
 }
 
 const testConfigManagedNodeImport = `
-resource "kepr_managed_node" "root_admin" {
+resource "keeper_managed_node" "root_admin" {
 }
 `

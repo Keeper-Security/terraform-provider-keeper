@@ -9,7 +9,7 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"terraform-provider-kepr/internal/provider"
+	"terraform-provider-keeper/internal/provider"
 )
 
 // Run "go generate" to format example terraform files and generate the docs for the registry/website
@@ -38,7 +38,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: "keepersecurity.com/Keeper-Security/kepr",
+		Address: "keepersecurity.com/Keeper-Security/keeper",
 		Debug:   debug,
 	}
 

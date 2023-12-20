@@ -3,9 +3,9 @@ package test
 import (
 	"crypto/ecdh"
 	"crypto/rsa"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/api"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/storage"
+	"github.com/keeper-security/keeper-sdk-golang/api"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
+	"github.com/keeper-security/keeper-sdk-golang/storage"
 	"sync/atomic"
 )
 
@@ -19,7 +19,7 @@ func (te testEntity[T, K]) GetAllEntities(cb func(T) bool) {
 	}
 }
 func (te testEntity[T, K]) GetEntity(uid K) (t T) {
-	t, _ = te[uid]
+	t = te[uid]
 	return
 }
 func (te testEntity[T, K]) deleteEntity(uid K) {
@@ -113,7 +113,7 @@ type testEnterpriseInfo struct {
 }
 
 func (ei *testEnterpriseInfo) EnterpriseName() string {
-	return "Kepr TF"
+	return "Keeper TF"
 }
 func (ei *testEnterpriseInfo) IsDistributor() bool {
 	return false
@@ -223,41 +223,38 @@ func (lm *testingManagement) GetEnterpriseId() (id int64, err error) {
 }
 func (lm *testingManagement) ModifyNodes(nodesToAdd []enterprise.INode, nodesToUpdate []enterprise.INode, nodesToDelete []int64) (errs []error) {
 	var ok bool
-	if nodesToUpdate != nil {
-		for _, node := range nodesToUpdate {
-			var nodeId = node.NodeId()
-			if (nodeId&0xff == 2) && node.ParentId() > 0 {
-				errs = append(errs, api.NewKeeperApiError("bad_inputs_parent_id", "can't move root"))
-			} else if node.NodeId() == node.ParentId() {
-				errs = append(errs, api.NewKeeperApiError("bad_inputs_parent_id", "parent node is self"))
-			} else if _, ok = lm.nodes[nodeId]; ok {
-				if _, ok = lm.nodes[node.ParentId()]; ok {
-					lm.nodes[node.NodeId()] = node
-				} else {
-					errs = append(errs, api.NewKeeperApiError("doesnt_exist", "parent node"))
-				}
+	for _, node := range nodesToUpdate {
+		var nodeId = node.NodeId()
+		if (nodeId&0xff == 2) && node.ParentId() > 0 {
+			errs = append(errs, api.NewKeeperApiError("bad_inputs_parent_id", "can't move root"))
+		} else if node.NodeId() == node.ParentId() {
+			errs = append(errs, api.NewKeeperApiError("bad_inputs_parent_id", "parent node is self"))
+		} else if _, ok = lm.nodes[nodeId]; ok {
+			if _, ok = lm.nodes[node.ParentId()]; ok {
+				lm.nodes[node.NodeId()] = node
 			} else {
-				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "node id"))
+				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "parent node"))
 			}
+		} else {
+			errs = append(errs, api.NewKeeperApiError("doesnt_exist", "node id"))
 		}
 	}
 
-	if nodesToAdd != nil {
-		for _, node := range nodesToAdd {
-			var nodeId = node.NodeId()
-			if nodeId>>32 != int64(lm.enterpriseId) {
-				errs = append(errs, api.NewKeeperApiError("bad_inputs_node_id", "out of range"))
-			} else if _, ok = lm.nodes[nodeId]; !ok {
-				if _, ok = lm.nodes[node.ParentId()]; ok {
-					lm.nodes[node.NodeId()] = node
-				} else {
-					errs = append(errs, api.NewKeeperApiError("doesnt_exist", "parent node"))
-				}
+	for _, node := range nodesToAdd {
+		var nodeId = node.NodeId()
+		if nodeId>>32 != int64(lm.enterpriseId) {
+			errs = append(errs, api.NewKeeperApiError("bad_inputs_node_id", "out of range"))
+		} else if _, ok = lm.nodes[nodeId]; !ok {
+			if _, ok = lm.nodes[node.ParentId()]; ok {
+				lm.nodes[node.NodeId()] = node
 			} else {
-				errs = append(errs, api.NewKeeperApiError("bad_inputs_node_id", "already exists"))
+				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "parent node"))
 			}
+		} else {
+			errs = append(errs, api.NewKeeperApiError("bad_inputs_node_id", "already exists"))
 		}
 	}
+
 	var parents = api.NewSet[int64]()
 	lm.nodes.GetAllEntities(func(r enterprise.INode) bool {
 		if r.ParentId() > 0 {
@@ -273,74 +270,65 @@ func (lm *testingManagement) ModifyNodes(nodesToAdd []enterprise.INode, nodesToU
 		parents.Add(u.NodeId())
 		return true
 	})
-	if nodesToDelete != nil {
-		for _, nodeId := range nodesToDelete {
-			if parents.Has(nodeId) {
-				errs = append(errs, api.NewKeeperApiError("node_not_empty", "delete node"))
-			} else if _, ok = lm.nodes[nodeId]; ok {
-				lm.nodes.deleteEntity(nodeId)
-				parents.Delete(nodeId)
-			} else {
-				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "existing node"))
-			}
+	for _, nodeId := range nodesToDelete {
+		if parents.Has(nodeId) {
+			errs = append(errs, api.NewKeeperApiError("node_not_empty", "delete node"))
+		} else if _, ok = lm.nodes[nodeId]; ok {
+			lm.nodes.deleteEntity(nodeId)
+			parents.Delete(nodeId)
+		} else {
+			errs = append(errs, api.NewKeeperApiError("doesnt_exist", "existing node"))
 		}
 	}
 	return
 }
 func (lm *testingManagement) ModifyRoles(rolesToAdd []enterprise.IRole, rolesToUpdate []enterprise.IRole, rolesToDelete []int64) (errs []error) {
 	var ok bool
-	if rolesToUpdate != nil {
-		for _, role := range rolesToUpdate {
-			var nodeId = role.NodeId()
-			if _, ok = lm.nodes[nodeId]; !ok {
+	for _, role := range rolesToUpdate {
+		if _, ok = lm.nodes[role.NodeId()]; !ok {
+			errs = append(errs, api.NewKeeperApiError("doesnt_exist", "parent node"))
+		} else if _, ok = lm.roles[role.RoleId()]; !ok {
+			errs = append(errs, api.NewKeeperApiError("doesnt_exist", "existing role"))
+		} else {
+			if role.NewUserInherit() {
+				var isAdmin = false
+				lm.managedNodes.GetLinksBySubject(role.RoleId(), func(mn enterprise.IManagedNode) bool {
+					isAdmin = true
+					return false
+				})
+				if isAdmin {
+					errs = append(errs, api.NewKeeperApiError("cant_add_inherit", "admin role cannot be inherited"))
+					continue
+				}
+			}
+			lm.roles[role.RoleId()] = role
+		}
+	}
+
+	for _, role := range rolesToAdd {
+		var roleId = role.RoleId()
+		if roleId>>32 != int64(lm.enterpriseId) {
+			errs = append(errs, api.NewKeeperApiError("bad_inputs_role_id", "out of range"))
+		} else if _, ok = lm.roles[roleId]; !ok {
+			if _, ok = lm.nodes[role.NodeId()]; ok {
+				lm.roles[roleId] = role
+			} else {
 				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "parent node"))
-			} else if _, ok = lm.roles[role.RoleId()]; !ok {
-				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "existing role"))
-			} else {
-				if role.NewUserInherit() {
-					var isAdmin = false
-					lm.managedNodes.GetLinksBySubject(role.RoleId(), func(mn enterprise.IManagedNode) bool {
-						isAdmin = true
-						return false
-					})
-					if isAdmin {
-						errs = append(errs, api.NewKeeperApiError("cant_add_inherit", "admin role cannot be inherited"))
-						continue
-					}
-				}
-				lm.roles[role.RoleId()] = role
 			}
+		} else {
+			errs = append(errs, api.NewKeeperApiError("exists", "already exists"))
 		}
 	}
 
-	if rolesToAdd != nil {
-		for _, role := range rolesToAdd {
-			var roleId = role.NodeId()
-			if roleId>>32 != int64(lm.enterpriseId) {
-				errs = append(errs, api.NewKeeperApiError("bad_inputs_role_id", "out of range"))
-			} else if _, ok = lm.roles[roleId]; !ok {
-				if _, ok = lm.nodes[role.NodeId()]; ok {
-					lm.roles[roleId] = role
-				} else {
-					errs = append(errs, api.NewKeeperApiError("doesnt_exist", "parent node"))
-				}
-			} else {
-				errs = append(errs, api.NewKeeperApiError("exists", "already exists"))
-			}
-		}
-	}
-
-	if rolesToDelete != nil {
-		for _, roleId := range rolesToDelete {
-			if _, ok = lm.roles[roleId]; ok {
-				lm.roles.deleteEntity(roleId)
-				lm.roleUsers.deleteSubject(roleId)
-				lm.roleEnforcements.deleteSubject(roleId)
-				lm.managedNodes.deleteSubject(roleId)
-				lm.rolePrivileges.deleteSubject(roleId)
-			} else {
-				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "existing role"))
-			}
+	for _, roleId := range rolesToDelete {
+		if _, ok = lm.roles[roleId]; ok {
+			lm.roles.deleteEntity(roleId)
+			lm.roleUsers.deleteSubject(roleId)
+			lm.roleEnforcements.deleteSubject(roleId)
+			lm.managedNodes.deleteSubject(roleId)
+			lm.rolePrivileges.deleteSubject(roleId)
+		} else {
+			errs = append(errs, api.NewKeeperApiError("doesnt_exist", "existing role"))
 		}
 	}
 
@@ -348,43 +336,38 @@ func (lm *testingManagement) ModifyRoles(rolesToAdd []enterprise.IRole, rolesToU
 }
 func (lm *testingManagement) ModifyTeams(teamsToAdd []enterprise.ITeam, teamsToUpdate []enterprise.ITeam, teamsToDelete []string) (errs []error) {
 	var ok bool
-	if teamsToUpdate != nil {
-		for _, team := range teamsToUpdate {
-			var nodeId = team.NodeId()
-			if _, ok = lm.nodes[nodeId]; !ok {
-				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "parent node"))
-			} else if _, ok = lm.teams[team.TeamUid()]; !ok {
-				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "existing team"))
-			} else {
-				lm.teams[team.TeamUid()] = team
-			}
-		}
-	}
-	if teamsToAdd != nil {
-		for _, team := range teamsToAdd {
-			var teamUid = team.TeamUid()
-			if _, ok = lm.teams[teamUid]; !ok {
-				if _, ok = lm.nodes[team.NodeId()]; ok {
-					lm.teams[teamUid] = team
-				} else {
-					errs = append(errs, api.NewKeeperApiError("doesnt_exist", "parent node"))
-				}
-			} else {
-				errs = append(errs, api.NewKeeperApiError("exists", "already exists"))
-			}
+	for _, team := range teamsToUpdate {
+		var nodeId = team.NodeId()
+		if _, ok = lm.nodes[nodeId]; !ok {
+			errs = append(errs, api.NewKeeperApiError("doesnt_exist", "parent node"))
+		} else if _, ok = lm.teams[team.TeamUid()]; !ok {
+			errs = append(errs, api.NewKeeperApiError("doesnt_exist", "existing team"))
+		} else {
+			lm.teams[team.TeamUid()] = team
 		}
 	}
 
-	if teamsToDelete != nil {
-		for _, teamUid := range teamsToDelete {
-			if _, ok = lm.teams[teamUid]; ok {
-				lm.teams.deleteEntity(teamUid)
-				lm.teamUsers.deleteSubject(teamUid)
-				lm.queuedTeamUsers.deleteSubject(teamUid)
-				lm.roleTeams.deleteObject(teamUid)
+	for _, team := range teamsToAdd {
+		var teamUid = team.TeamUid()
+		if _, ok = lm.teams[teamUid]; !ok {
+			if _, ok = lm.nodes[team.NodeId()]; ok {
+				lm.teams[teamUid] = team
 			} else {
-				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "existing team"))
+				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "parent node"))
 			}
+		} else {
+			errs = append(errs, api.NewKeeperApiError("exists", "already exists"))
+		}
+	}
+
+	for _, teamUid := range teamsToDelete {
+		if _, ok = lm.teams[teamUid]; ok {
+			lm.teams.deleteEntity(teamUid)
+			lm.teamUsers.deleteSubject(teamUid)
+			lm.queuedTeamUsers.deleteSubject(teamUid)
+			lm.roleTeams.deleteObject(teamUid)
+		} else {
+			errs = append(errs, api.NewKeeperApiError("doesnt_exist", "existing team"))
 		}
 	}
 
@@ -392,145 +375,133 @@ func (lm *testingManagement) ModifyTeams(teamsToAdd []enterprise.ITeam, teamsToU
 }
 
 func (lm *testingManagement) ModifyTeamUsers(teamUsersToAdd []enterprise.ITeamUser, teamUsersToRemove []enterprise.ITeamUser) (errs []error) {
-	if teamUsersToAdd != nil {
-		for _, teamUser := range teamUsersToAdd {
-			var teamUid = teamUser.TeamUid()
-			var eUserId = teamUser.EnterpriseUserId()
-			var l = lm.teamUsers.GetLink(teamUid, eUserId)
-			if l == nil {
-				if team := lm.teams.GetEntity(teamUid); team != nil {
-					if user := lm.users.GetEntity(eUserId); user != nil {
-						if user.Status() == "active" {
-							lm.teamUsers.addLink(teamUser)
-						} else {
-							errs = append(errs, api.NewKeeperApiError("cant_be_pending", "user cannot be pending"))
-						}
+	for _, teamUser := range teamUsersToAdd {
+		var teamUid = teamUser.TeamUid()
+		var eUserId = teamUser.EnterpriseUserId()
+		var l = lm.teamUsers.GetLink(teamUid, eUserId)
+		if l == nil {
+			if team := lm.teams.GetEntity(teamUid); team != nil {
+				if user := lm.users.GetEntity(eUserId); user != nil {
+					if user.Status() == "active" {
+						lm.teamUsers.addLink(teamUser)
 					} else {
-						errs = append(errs, api.NewKeeperApiError("doesnt_exist", "user does not exist"))
+						errs = append(errs, api.NewKeeperApiError("cant_be_pending", "user cannot be pending"))
 					}
 				} else {
-					errs = append(errs, api.NewKeeperApiError("doesnt_exist", "team does not exist"))
+					errs = append(errs, api.NewKeeperApiError("doesnt_exist", "user does not exist"))
 				}
 			} else {
-				errs = append(errs, api.NewKeeperApiError("exists", "already exists"))
+				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "team does not exist"))
 			}
+		} else {
+			errs = append(errs, api.NewKeeperApiError("exists", "already exists"))
 		}
 	}
 
-	if teamUsersToRemove != nil {
-		for _, teamUser := range teamUsersToRemove {
-			var teamUid = teamUser.TeamUid()
-			var eUserId = teamUser.EnterpriseUserId()
-			var l = lm.teamUsers.GetLink(teamUid, eUserId)
-			if l != nil {
-				var link = enterprise.LinkKey[string, int64]{
-					V1: teamUid,
-					V2: eUserId,
-				}
-				lm.teamUsers.deleteLink(link)
-			} else {
-				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "team membership does not exist"))
+	for _, teamUser := range teamUsersToRemove {
+		var teamUid = teamUser.TeamUid()
+		var eUserId = teamUser.EnterpriseUserId()
+		var l = lm.teamUsers.GetLink(teamUid, eUserId)
+		if l != nil {
+			var link = enterprise.LinkKey[string, int64]{
+				V1: teamUid,
+				V2: eUserId,
 			}
+			lm.teamUsers.deleteLink(link)
+		} else {
+			errs = append(errs, api.NewKeeperApiError("doesnt_exist", "team membership does not exist"))
 		}
 	}
 	return
 }
 func (lm *testingManagement) ModifyRoleUsers(roleUsersToAdd []enterprise.IRoleUser, roleUsersToRemove []enterprise.IRoleUser) (errs []error) {
-	if roleUsersToAdd != nil {
-		for _, roleUser := range roleUsersToAdd {
-			var roleId = roleUser.RoleId()
-			var eUserId = roleUser.EnterpriseUserId()
-			var l = lm.roleUsers.GetLink(roleId, eUserId)
-			if l == nil {
-				if role := lm.roles.GetEntity(roleId); role != nil {
-					var isAdmin = false
-					lm.managedNodes.GetLinksBySubject(roleId, func(x enterprise.IManagedNode) bool {
-						isAdmin = true
-						return false
-					})
-					if user := lm.users.GetEntity(eUserId); user != nil {
-						if isAdmin && user.Status() == "active" {
-							lm.roleUsers.addLink(roleUser)
-						} else {
-							errs = append(errs, api.NewKeeperApiError("cant_be_pending", "admin role: user cannot be pending"))
-						}
+	for _, roleUser := range roleUsersToAdd {
+		var roleId = roleUser.RoleId()
+		var eUserId = roleUser.EnterpriseUserId()
+		var l = lm.roleUsers.GetLink(roleId, eUserId)
+		if l == nil {
+			if role := lm.roles.GetEntity(roleId); role != nil {
+				var isAdmin = false
+				lm.managedNodes.GetLinksBySubject(roleId, func(x enterprise.IManagedNode) bool {
+					isAdmin = true
+					return false
+				})
+				if user := lm.users.GetEntity(eUserId); user != nil {
+					if isAdmin && user.Status() == "active" {
+						lm.roleUsers.addLink(roleUser)
 					} else {
-						errs = append(errs, api.NewKeeperApiError("doesnt_exist", "user does not exist"))
+						errs = append(errs, api.NewKeeperApiError("cant_be_pending", "admin role: user cannot be pending"))
 					}
 				} else {
-					errs = append(errs, api.NewKeeperApiError("doesnt_exist", "role does not exist"))
+					errs = append(errs, api.NewKeeperApiError("doesnt_exist", "user does not exist"))
 				}
 			} else {
-				errs = append(errs, api.NewKeeperApiError("exists", "already exists"))
+				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "role does not exist"))
 			}
+		} else {
+			errs = append(errs, api.NewKeeperApiError("exists", "already exists"))
 		}
 	}
 
-	if roleUsersToRemove != nil {
-		for _, roleUser := range roleUsersToRemove {
-			var roleId = roleUser.RoleId()
-			var eUserId = roleUser.EnterpriseUserId()
-			var l = lm.roleUsers.GetLink(roleId, eUserId)
-			if l != nil {
-				var link = enterprise.LinkKey[int64, int64]{
-					V1: roleId,
-					V2: eUserId,
-				}
-				lm.roleUsers.deleteLink(link)
-			} else {
-				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "role membership does not exist"))
+	for _, roleUser := range roleUsersToRemove {
+		var roleId = roleUser.RoleId()
+		var eUserId = roleUser.EnterpriseUserId()
+		var l = lm.roleUsers.GetLink(roleId, eUserId)
+		if l != nil {
+			var link = enterprise.LinkKey[int64, int64]{
+				V1: roleId,
+				V2: eUserId,
 			}
+			lm.roleUsers.deleteLink(link)
+		} else {
+			errs = append(errs, api.NewKeeperApiError("doesnt_exist", "role membership does not exist"))
 		}
 	}
 	return
 }
 
 func (lm *testingManagement) ModifyRoleTeams(roleTeamsToAdd []enterprise.IRoleTeam, roleTeamsToRemove []enterprise.IRoleTeam) (errs []error) {
-	if roleTeamsToAdd != nil {
-		for _, roleTeam := range roleTeamsToAdd {
-			var roleId = roleTeam.RoleId()
-			var teamUid = roleTeam.TeamUid()
-			var l = lm.roleTeams.GetLink(roleId, teamUid)
-			if l == nil {
-				if role := lm.roles.GetEntity(roleId); role != nil {
-					var isAdmin = false
-					lm.managedNodes.GetLinksBySubject(roleId, func(x enterprise.IManagedNode) bool {
-						isAdmin = true
-						return false
-					})
-					if !isAdmin {
-						if team := lm.teams.GetEntity(teamUid); team != nil {
-							lm.roleTeams.addLink(roleTeam)
-						} else {
-							errs = append(errs, api.NewKeeperApiError("doesnt_exist", "team does not exist"))
-						}
-
+	for _, roleTeam := range roleTeamsToAdd {
+		var roleId = roleTeam.RoleId()
+		var teamUid = roleTeam.TeamUid()
+		var l = lm.roleTeams.GetLink(roleId, teamUid)
+		if l == nil {
+			if role := lm.roles.GetEntity(roleId); role != nil {
+				var isAdmin = false
+				lm.managedNodes.GetLinksBySubject(roleId, func(x enterprise.IManagedNode) bool {
+					isAdmin = true
+					return false
+				})
+				if !isAdmin {
+					if team := lm.teams.GetEntity(teamUid); team != nil {
+						lm.roleTeams.addLink(roleTeam)
 					} else {
-						errs = append(errs, api.NewKeeperApiError("cant_add_admin_role", "admin role: team cannot be added"))
+						errs = append(errs, api.NewKeeperApiError("doesnt_exist", "team does not exist"))
 					}
+
 				} else {
-					errs = append(errs, api.NewKeeperApiError("doesnt_exist", "role does not exist"))
+					errs = append(errs, api.NewKeeperApiError("cant_add_admin_role", "admin role: team cannot be added"))
 				}
 			} else {
-				errs = append(errs, api.NewKeeperApiError("exists", "already exists"))
+				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "role does not exist"))
 			}
+		} else {
+			errs = append(errs, api.NewKeeperApiError("exists", "already exists"))
 		}
 	}
 
-	if roleTeamsToRemove != nil {
-		for _, roleTeam := range roleTeamsToRemove {
-			var roleId = roleTeam.RoleId()
-			var teamUid = roleTeam.TeamUid()
-			var l = lm.roleTeams.GetLink(roleId, teamUid)
-			if l != nil {
-				var link = enterprise.LinkKey[int64, string]{
-					V1: roleId,
-					V2: teamUid,
-				}
-				lm.roleTeams.deleteLink(link)
-			} else {
-				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "role-team does not exist"))
+	for _, roleTeam := range roleTeamsToRemove {
+		var roleId = roleTeam.RoleId()
+		var teamUid = roleTeam.TeamUid()
+		var l = lm.roleTeams.GetLink(roleId, teamUid)
+		if l != nil {
+			var link = enterprise.LinkKey[int64, string]{
+				V1: roleId,
+				V2: teamUid,
 			}
+			lm.roleTeams.deleteLink(link)
+		} else {
+			errs = append(errs, api.NewKeeperApiError("doesnt_exist", "role-team does not exist"))
 		}
 	}
 	return
@@ -539,47 +510,42 @@ func (lm *testingManagement) ModifyRoleTeams(roleTeamsToAdd []enterprise.IRoleTe
 func (lm *testingManagement) ModifyManagedNodes(managedNodesToAdd []enterprise.IManagedNode, managedNodesToUpdate []enterprise.IManagedNode, managedNodesToRemove []enterprise.IManagedNode) (errs []error) {
 	var ok bool
 	var link enterprise.LinkKey[int64, int64]
-	if managedNodesToUpdate != nil {
-		for _, managedNode := range managedNodesToUpdate {
-			link.V1 = managedNode.RoleId()
-			link.V2 = managedNode.ManagedNodeId()
-			if _, ok = lm.managedNodes[link]; !ok {
-				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "managed node"))
-			} else {
-				lm.managedNodes[link] = managedNode
-			}
-		}
-	}
-	if managedNodesToAdd != nil {
-		for _, managedNode := range managedNodesToAdd {
-			link.V1 = managedNode.RoleId()
-			link.V2 = managedNode.ManagedNodeId()
-			if _, ok = lm.managedNodes[link]; !ok {
-				if _, ok = lm.roles[managedNode.RoleId()]; ok {
-					if _, ok = lm.nodes[managedNode.ManagedNodeId()]; ok {
-						lm.managedNodes[link] = managedNode
-					} else {
-						errs = append(errs, api.NewKeeperApiError("doesnt_exist", "node"))
-					}
-				} else {
-					errs = append(errs, api.NewKeeperApiError("doesnt_exist", "role"))
-				}
-			} else {
-				errs = append(errs, api.NewKeeperApiError("exists", "already exists"))
-			}
+	for _, managedNode := range managedNodesToUpdate {
+		link.V1 = managedNode.RoleId()
+		link.V2 = managedNode.ManagedNodeId()
+		if _, ok = lm.managedNodes[link]; !ok {
+			errs = append(errs, api.NewKeeperApiError("doesnt_exist", "managed node"))
+		} else {
+			lm.managedNodes[link] = managedNode
 		}
 	}
 
-	if managedNodesToRemove != nil {
-		for _, managedNode := range managedNodesToRemove {
-			link.V1 = managedNode.RoleId()
-			link.V2 = managedNode.ManagedNodeId()
-			if _, ok = lm.managedNodes[link]; ok {
-				lm.managedNodes.deleteLink(link)
-				lm.rolePrivileges.deleteLink(link)
+	for _, managedNode := range managedNodesToAdd {
+		link.V1 = managedNode.RoleId()
+		link.V2 = managedNode.ManagedNodeId()
+		if _, ok = lm.managedNodes[link]; !ok {
+			if _, ok = lm.roles[managedNode.RoleId()]; ok {
+				if _, ok = lm.nodes[managedNode.ManagedNodeId()]; ok {
+					lm.managedNodes[link] = managedNode
+				} else {
+					errs = append(errs, api.NewKeeperApiError("doesnt_exist", "node"))
+				}
 			} else {
-				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "existing managed node"))
+				errs = append(errs, api.NewKeeperApiError("doesnt_exist", "role"))
 			}
+		} else {
+			errs = append(errs, api.NewKeeperApiError("exists", "already exists"))
+		}
+	}
+
+	for _, managedNode := range managedNodesToRemove {
+		link.V1 = managedNode.RoleId()
+		link.V2 = managedNode.ManagedNodeId()
+		if _, ok = lm.managedNodes[link]; ok {
+			lm.managedNodes.deleteLink(link)
+			lm.rolePrivileges.deleteLink(link)
+		} else {
+			errs = append(errs, api.NewKeeperApiError("doesnt_exist", "existing managed node"))
 		}
 	}
 
@@ -595,7 +561,14 @@ func (lm *testingManagement) ModifyRolePrivileges(privileges []enterprise.IRoleP
 
 func (lm *testingManagement) ModifyRoleEnforcements(enforcementsToSet []enterprise.IRoleEnforcement) (err []error) {
 	for _, e := range enforcementsToSet {
-		lm.roleEnforcements.addLink(e)
+		if len(e.Value()) > 0 {
+			lm.roleEnforcements.addLink(e)
+		} else {
+			lm.roleEnforcements.deleteLink(enterprise.LinkKey[int64, string]{
+				V1: e.RoleId(),
+				V2: e.EnforcementType(),
+			})
+		}
 	}
 	return
 }

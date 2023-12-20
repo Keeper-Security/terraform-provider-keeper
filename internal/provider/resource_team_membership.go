@@ -9,8 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/api"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
+	"github.com/keeper-security/keeper-sdk-golang/api"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
 )
 
 func newTeamMembershipResource() resource.Resource {

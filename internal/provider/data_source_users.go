@@ -9,11 +9,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/api"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
+	"github.com/keeper-security/keeper-sdk-golang/api"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
 	"reflect"
 	"strings"
-	"terraform-provider-kepr/internal/model"
+	"terraform-provider-keeper/internal/model"
 )
 
 var (
@@ -131,6 +131,10 @@ func (d *usersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 
 		var sv types.Set
 		sv, diags = uq.Emails.ToSetValue(ctx)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 		for _, v := range sv.Elements() {
 			var ok bool
 			var strv types.String
@@ -152,6 +156,7 @@ func (d *usersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		}
 	}
 
+	state.Users = make([]*model.UserModel, 0)
 	d.users.GetAllEntities(func(u enterprise.IUser) (resume bool) {
 		resume = true
 		if !activeMatcher(u) {

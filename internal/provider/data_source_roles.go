@@ -7,9 +7,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
 	"reflect"
-	"terraform-provider-kepr/internal/model"
+	"terraform-provider-keeper/internal/model"
 )
 
 var (
@@ -19,7 +19,7 @@ var (
 type rolesDataSourceModel struct {
 	FilterCriteria *model.FilterCriteria `tfsdk:"filter"`
 	NodeCriteria   *model.NodeCriteria   `tfsdk:"nodes"`
-	Roles          []*roleModel          `tfsdk:"roles"`
+	Roles          []*model.RoleModel    `tfsdk:"roles"`
 }
 
 type rolesDataSource struct {
@@ -28,7 +28,7 @@ type rolesDataSource struct {
 	managedNodes enterprise.IEnterpriseLink[enterprise.IManagedNode, int64, int64]
 }
 
-func NewRolesDataSource() datasource.DataSource {
+func newRolesDataSource() datasource.DataSource {
 	return &rolesDataSource{}
 }
 
@@ -51,7 +51,7 @@ func (d *rolesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 			"roles": schema.ListNestedAttribute{
 				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
-					Attributes: roleSchemaAttributes,
+					Attributes: model.RoleSchemaAttributes,
 				},
 			},
 		},
@@ -90,7 +90,7 @@ func (d *rolesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	}
 
 	var fm model.Matcher
-	fm, diags = model.GetFieldMatcher(rq.FilterCriteria, reflect.TypeOf((*roleModel)(nil)))
+	fm, diags = model.GetFieldMatcher(rq.FilterCriteria, reflect.TypeOf((*model.RoleModel)(nil)))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -98,6 +98,7 @@ func (d *rolesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 
 	var state = rq
 
+	state.Roles = make([]*model.RoleModel, 0)
 	d.roles.GetAllEntities(func(r enterprise.IRole) bool {
 		if nm != nil {
 			if !nm(r.NodeId()) {
@@ -109,8 +110,8 @@ func (d *rolesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			isAdmin = true
 			return false
 		})
-		var role = new(roleModel)
-		role.fromKeeper(r, isAdmin)
+		var role = new(model.RoleModel)
+		role.FromKeeper(r, isAdmin)
 		if fm != nil {
 			if !fm(role) {
 				return true

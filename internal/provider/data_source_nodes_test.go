@@ -12,37 +12,37 @@ func TestAccDataSourceNodes_Read(t *testing.T) {
 			{
 				Config: testConfigNodesDataSource,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.kepr_nodes.by_subnode", "nodes.#", "2"),
-					resource.TestCheckResourceAttr("data.kepr_nodes.by_subnode", "nodes.0.node_id", "5299989643266"),
-					resource.TestCheckResourceAttr("data.kepr_nodes.by_subnode", "nodes.1.node_id", "5299989643274"),
-					resource.TestCheckResourceAttr("data.kepr_nodes.by_parent_id", "nodes.#", "1"),
-					resource.TestCheckResourceAttr("data.kepr_nodes.by_parent_id", "nodes.0.node_id", "5299989643274"),
-					resource.TestCheckResourceAttr("data.kepr_nodes.by_visibility", "nodes.#", "1"),
-					resource.TestCheckResourceAttr("data.kepr_nodes.by_visibility", "nodes.0.node_id", "5299989643274"),
+					resource.TestCheckResourceAttr("data.keeper_nodes.by_subnode", "nodes.#", "2"),
+					resource.TestCheckResourceAttr("data.keeper_nodes.by_subnode", "nodes.0.node_id", "5299989643266"),
+					resource.TestCheckResourceAttr("data.keeper_nodes.by_subnode", "nodes.1.node_id", "5299989643274"),
+					resource.TestCheckResourceAttr("data.keeper_nodes.by_parent_id", "nodes.#", "1"),
+					resource.TestCheckResourceAttr("data.keeper_nodes.by_parent_id", "nodes.0.node_id", "5299989643274"),
+					resource.TestCheckResourceAttr("data.keeper_nodes.by_visibility", "nodes.#", "1"),
+					resource.TestCheckResourceAttr("data.keeper_nodes.by_visibility", "nodes.0.node_id", "5299989643274"),
 				),
 			},
 		}})
 }
 
 const testConfigNodesDataSource = `
-data "kepr_node" "root" {
+data "keeper_node" "root" {
   is_root = true
 }
 
-data "kepr_nodes" "by_subnode" {
+data "keeper_nodes" "by_subnode" {
   subnodes = {
     include_parent = true
-    node_id = data.kepr_node.root.node_id
+    node_id = data.keeper_node.root.node_id
     cascade = true
   }
 }
-data "kepr_nodes" "by_parent_id" {
+data "keeper_nodes" "by_parent_id" {
   filter = {
     field = "parent_id"
     value = "5299989643266"
   }
 }
-data "kepr_nodes" "by_visibility" {
+data "keeper_nodes" "by_visibility" {
   filter = {
     field = "restrict_visibility"
     value = "true"

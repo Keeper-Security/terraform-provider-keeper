@@ -6,7 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/keeper-security/keeper-sdk-golang/sdk/enterprise"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
 	"path"
 	"reflect"
 	"strconv"
@@ -208,9 +208,9 @@ func getStrMatcher(field reflect.StructField, structType reflect.Type, strValue 
 		} else if sv != nil {
 			switch op {
 			case StrOp_Equal:
-				return strings.ToLower(*sv) == strings.ToLower(*strValue)
+				return strings.EqualFold(*sv, *strValue)
 			case StrOp_NotEqual:
-				return strings.ToLower(*sv) != strings.ToLower(*strValue)
+				return strings.EqualFold(*sv, *strValue)
 			case StrOp_StartsWith:
 				return strings.HasPrefix(strings.ToLower(*sv), strings.ToLower(*strValue))
 			case StrOp_EndsWith:
@@ -459,7 +459,7 @@ func GetFieldMatcher(fc *FilterCriteria, modelType reflect.Type) (cb Matcher, di
 		cb = getBoolMatcher(field, modelType, bv)
 
 	case matcherType_String:
-		var strOp = StrOp_Invalid
+		var strOp StrOp
 		if strOp, ok = stringOperators[op]; !ok {
 			var ops []string
 			for k := range stringOperators {
@@ -477,15 +477,15 @@ func GetFieldMatcher(fc *FilterCriteria, modelType reflect.Type) (cb Matcher, di
 		}
 		if sv == nil {
 			if strOp != IntOp_Equal && strOp != IntOp_NotEqual {
-				diags.AddError(fmt.Sprintf("\"null\" comparison value can be used with \"==\" or \"!=\" operators"),
-					"Field \"%s\" is defined as a string field.")
+				diags.AddError("\"null\" comparison value can be used with \"==\" or \"!=\" operators",
+					fmt.Sprintf("Field \"%s\" is defined as a string field.", fieldName))
 				return
 			}
 		}
 		cb = getStrMatcher(field, modelType, sv, strOp)
 
 	case matcherType_Int64:
-		var intOp = IntOp_Invalid
+		var intOp IntOp
 		if intOp, ok = integerOperators[op]; !ok {
 			var ops []string
 			for k := range integerOperators {
@@ -501,7 +501,7 @@ func GetFieldMatcher(fc *FilterCriteria, modelType reflect.Type) (cb Matcher, di
 			var ii int
 			if ii, err = strconv.Atoi(fieldValue); err != nil {
 				diags.AddError(fmt.Sprintf("\"%s\" field value should be an integer. Got \"%s\"", fieldName, fieldValue),
-					"Field \"%s\" is defined as an integer field.")
+					fmt.Sprintf("Field \"%s\" is defined as an integer field.", fieldName))
 				return
 			} else {
 				iv = new(int64)
@@ -510,8 +510,8 @@ func GetFieldMatcher(fc *FilterCriteria, modelType reflect.Type) (cb Matcher, di
 		}
 		if iv == nil {
 			if intOp != IntOp_Equal && intOp != IntOp_NotEqual {
-				diags.AddError(fmt.Sprintf("\"null\" comparison value can be used with \"==\" or \"!=\" operators"),
-					"Field \"%s\" is defined as an integer field.")
+				diags.AddError("\"null\" comparison value can be used with \"==\" or \"!=\" operators",
+					fmt.Sprintf("Field \"%s\" is defined as an integer field.", fieldName))
 				return
 			}
 		}
