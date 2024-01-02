@@ -2,9 +2,12 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
+	"github.com/keeper-security/keeper-sdk-golang/vault"
 	"reflect"
 	"terraform-provider-keeper/internal/model"
 )
@@ -14,6 +17,7 @@ var (
 )
 
 type enforcementsRecordTypesDataSource struct {
+	recordTypes []vault.IRecordType
 }
 
 func newEnforcementsRecordTypesDataSource() datasource.DataSource {
@@ -36,11 +40,31 @@ func (d *enforcementsRecordTypesDataSource) Schema(_ context.Context, _ datasour
 }
 
 func (d *enforcementsRecordTypesDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+	if ed, ok := req.ProviderData.(enterprise.IEnterpriseData); ok {
+		ed.RecordTypes().GetAllEntities(func(x vault.IRecordType) bool {
+			d.recordTypes = append(d.recordTypes, x)
+			return true
+		})
+	} else {
+		resp.Diagnostics.AddError(
+			"Unexpected Data Source Configure Type",
+			fmt.Sprintf("Expected \"IEnterpriseData\", got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+	}
 }
 
 func (d *enforcementsRecordTypesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var rq model.EnforcementsRecordTypesDataSourceModel
 	diags := req.Config.Get(ctx, &rq)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	diags = rq.VerifyNames(d.recordTypes)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

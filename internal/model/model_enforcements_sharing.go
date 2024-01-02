@@ -5,19 +5,19 @@ import (
 )
 
 type EnforcementsSharingDataSourceModel struct {
-	RestrictSharingOutsideOfIsolatedNodes types.Bool   `tfsdk:"restrict_sharing_outside_of_isolated_nodes"`
-	RestrictLinkSharing                   types.Bool   `tfsdk:"restrict_link_sharing"`
-	RestrictSharingRecordWithAttachments  types.Bool   `tfsdk:"restrict_sharing_record_with_attachments"`
-	RequireAccountShare                   types.String `tfsdk:"require_account_share"`
-	RestrictFileUpload                    types.Bool   `tfsdk:"restrict_file_upload"`
-	RestrictExport                        types.Bool   `tfsdk:"restrict_export"`
-	RestrictImport                        types.Bool   `tfsdk:"restrict_import"`
-	RestrictSharingEnterpriseIncoming     types.Bool   `tfsdk:"restrict_sharing_enterprise_incoming"`
-	RestrictSharingEnterpriseOutgoing     types.Bool   `tfsdk:"restrict_sharing_enterprise_outgoing"`
-	RestrictSharingAllIncoming            types.Bool   `tfsdk:"restrict_sharing_all_incoming"`
-	RestrictSharingAllOutgoing            types.Bool   `tfsdk:"restrict_sharing_all_outgoing"`
-	RestrictSharingRecordToSharedFolders  types.Bool   `tfsdk:"restrict_sharing_record_to_shared_folders"`
-	RestrictCreateSharedFolder            types.Bool   `tfsdk:"restrict_create_shared_folder"`
+	RestrictSharingOutsideOfIsolatedNodes types.Bool  `tfsdk:"restrict_sharing_outside_of_isolated_nodes"`
+	RestrictLinkSharing                   types.Bool  `tfsdk:"restrict_link_sharing"`
+	RestrictSharingRecordWithAttachments  types.Bool  `tfsdk:"restrict_sharing_record_with_attachments"`
+	RequireAccountShare                   types.Int64 `tfsdk:"require_account_share"`
+	RestrictFileUpload                    types.Bool  `tfsdk:"restrict_file_upload"`
+	RestrictExport                        types.Bool  `tfsdk:"restrict_export"`
+	RestrictImport                        types.Bool  `tfsdk:"restrict_import"`
+	RestrictSharingEnterpriseIncoming     types.Bool  `tfsdk:"restrict_sharing_enterprise_incoming"`
+	RestrictSharingEnterpriseOutgoing     types.Bool  `tfsdk:"restrict_sharing_enterprise_outgoing"`
+	RestrictSharingAllIncoming            types.Bool  `tfsdk:"restrict_sharing_all_incoming"`
+	RestrictSharingAllOutgoing            types.Bool  `tfsdk:"restrict_sharing_all_outgoing"`
+	RestrictSharingRecordToSharedFolders  types.Bool  `tfsdk:"restrict_sharing_record_to_shared_folders"`
+	RestrictCreateSharedFolder            types.Bool  `tfsdk:"restrict_create_shared_folder"`
 }
 
 func (esm *EnforcementsSharingDataSourceModel) ToKeeper(enforcements map[string]string) {
@@ -33,7 +33,7 @@ func (esm *EnforcementsSharingDataSourceModel) ToKeeper(enforcements map[string]
 	getBoolValue(esm.RestrictSharingAllOutgoing, "restrict_sharing_all_outgoing", enforcements)
 	getBoolValue(esm.RestrictSharingRecordToSharedFolders, "restrict_sharing_record_to_shared_folders", enforcements)
 	getBoolValue(esm.RestrictCreateSharedFolder, "restrict_create_shared_folder", enforcements)
-	getStringValue(esm.RequireAccountShare, "require_account_share", enforcements)
+	getInt64Value(esm.RequireAccountShare, "require_account_share", enforcements)
 }
 
 func (esm *EnforcementsSharingDataSourceModel) FromKeeper(enforcements map[string]string) {
@@ -49,7 +49,7 @@ func (esm *EnforcementsSharingDataSourceModel) FromKeeper(enforcements map[strin
 	setBoolValue(&esm.RestrictSharingAllOutgoing, "restrict_sharing_all_outgoing", enforcements)
 	setBoolValue(&esm.RestrictSharingRecordToSharedFolders, "restrict_sharing_record_to_shared_folders", enforcements)
 	setBoolValue(&esm.RestrictCreateSharedFolder, "restrict_create_shared_folder", enforcements)
-	setStringValue(&esm.RequireAccountShare, "require_account_share", enforcements)
+	setInt64Value(&esm.RequireAccountShare, "require_account_share", enforcements)
 }
 
 func (esm *EnforcementsSharingDataSourceModel) IsBlank() bool {

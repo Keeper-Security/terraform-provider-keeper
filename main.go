@@ -6,9 +6,9 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
-
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+	"github.com/keeper-security/keeper-sdk-golang/enterprise"
+	"log"
 	"terraform-provider-keeper/internal/provider"
 )
 
@@ -41,8 +41,8 @@ func main() {
 		Address: "keepersecurity.com/Keeper-Security/keeper",
 		Debug:   debug,
 	}
-
-	err := providerserver.Serve(context.Background(), provider.New(version), opts)
+	var management enterprise.IEnterpriseManagement
+	err := providerserver.Serve(context.Background(), provider.New(version, &management), opts)
 
 	if err != nil {
 		log.Fatal(err.Error())

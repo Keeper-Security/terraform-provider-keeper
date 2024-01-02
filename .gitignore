@@ -48,4 +48,4 @@ website/vendor
 # vendor/
 
 # Go workspace file
-go.work
+go.work*

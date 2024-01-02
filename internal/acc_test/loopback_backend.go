@@ -1,4 +1,4 @@
-package test
+package acc_test
 
 import (
 	"crypto/ecdh"
@@ -6,6 +6,7 @@ import (
 	"github.com/keeper-security/keeper-sdk-golang/api"
 	"github.com/keeper-security/keeper-sdk-golang/enterprise"
 	"github.com/keeper-security/keeper-sdk-golang/storage"
+	"github.com/keeper-security/keeper-sdk-golang/vault"
 	"sync/atomic"
 )
 
@@ -151,6 +152,7 @@ type testingManagement struct {
 	bridges          testEntity[enterprise.IBridge, int64]
 	scims            testEntity[enterprise.IScim, int64]
 	managedCompanies testEntity[enterprise.IManagedCompany, int64]
+	recordTypes      testEntity[vault.IRecordType, string]
 }
 
 func (lm *testingManagement) EnterpriseData() enterprise.IEnterpriseData {
@@ -215,6 +217,9 @@ func (lm *testingManagement) Scims() enterprise.IEnterpriseEntity[enterprise.ISc
 }
 func (lm *testingManagement) ManagedCompanies() enterprise.IEnterpriseEntity[enterprise.IManagedCompany, int64] {
 	return lm.managedCompanies
+}
+func (lm *testingManagement) RecordTypes() enterprise.IEnterpriseEntity[vault.IRecordType, string] {
+	return lm.recordTypes
 }
 
 func (lm *testingManagement) GetEnterpriseId() (id int64, err error) {

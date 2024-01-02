@@ -15,6 +15,7 @@ import (
 )
 
 var EnforcementLookup map[string]enterprise.IEnforcement
+var availableDurations []string
 
 func init() {
 	EnforcementLookup = make(map[string]enterprise.IEnforcement)
@@ -22,6 +23,9 @@ func init() {
 		EnforcementLookup[strings.ToLower(enforcement.Name())] = enforcement
 		return true
 	})
+	for k := range tfaDurations {
+		availableDurations = append(availableDurations, k)
+	}
 }
 
 func extractTfSdkFields(modelType reflect.Type, cb func(string)) (err error) {
@@ -59,6 +63,35 @@ func GenerateEnforcementResourceSchema(modelType reflect.Type) (rs map[string]rs
 					Description: description,
 				}
 			case "long":
+				rs[name] = rsschema.Int64Attribute{
+					Optional:    true,
+					Description: description,
+				}
+			case "ternary_edn", "ternary_den":
+				rs[name] = rsschema.StringAttribute{
+					Optional:    true,
+					Description: description,
+					Validators:  []validator.String{stringvalidator.OneOf("enforce", "disable", "e", "d")},
+				}
+			case "ip_whitelist":
+				rs[name] = rsschema.ListAttribute{
+					ElementType: types.StringType,
+					Optional:    true,
+					Description: description,
+				}
+			case "record_types":
+				rs[name] = rsschema.SetAttribute{
+					ElementType: types.StringType,
+					Optional:    true,
+					Description: description,
+				}
+			case "two_factor_duration":
+				rs[name] = rsschema.StringAttribute{
+					Optional:    true,
+					Description: description,
+					Validators:  []validator.String{stringvalidator.OneOf(availableDurations...)},
+				}
+			case "account_share":
 				rs[name] = rsschema.Int64Attribute{
 					Optional:    true,
 					Description: description,
@@ -155,6 +188,23 @@ func GenerateEnforcementDataSourceSchema(modelType reflect.Type) (ds map[string]
 			case "ip_whitelist":
 				ds[name] = rsschema.ListAttribute{
 					ElementType: types.StringType,
+					Optional:    true,
+					Description: description,
+				}
+			case "record_types":
+				ds[name] = rsschema.SetAttribute{
+					ElementType: types.StringType,
+					Optional:    true,
+					Description: description,
+				}
+			case "two_factor_duration":
+				ds[name] = rsschema.StringAttribute{
+					Optional:    true,
+					Description: description,
+					Validators:  []validator.String{stringvalidator.OneOf(availableDurations...)},
+				}
+			case "account_share":
+				ds[name] = rsschema.Int64Attribute{
 					Optional:    true,
 					Description: description,
 				}

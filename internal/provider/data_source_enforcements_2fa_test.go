@@ -12,7 +12,7 @@ func TestAccDataSourceEnforcements2Fa(t *testing.T) {
 			{
 				Config: testAccEnforcements2FaDataSourceConfig,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.keeper_enforcements_2fa.test", "two_factor_duration_desktop", "0,12,24,30,9999"),
+					resource.TestCheckResourceAttr("data.keeper_enforcements_2fa.test", "two_factor_duration_desktop", "30_days"),
 					resource.TestCheckResourceAttr("data.keeper_enforcements_2fa.test", "restrict_two_factor_channel_google", "true"),
 					resource.TestCheckResourceAttr("data.keeper_enforcements_2fa.test", "restrict_two_factor_channel_text", "true"),
 					resource.TestCheckResourceAttr("data.keeper_enforcements_2fa.test", "require_two_factor", "true"),
@@ -23,7 +23,8 @@ func TestAccDataSourceEnforcements2Fa(t *testing.T) {
 
 const testAccEnforcements2FaDataSourceConfig = `
 data "keeper_enforcements_2fa" "test" {
-  two_factor_duration_desktop = "0,12,24,30,9999"
+  two_factor_duration_desktop = "30_days"
+  two_factor_duration_mobile = "login"
   restrict_two_factor_channel_google = true
   restrict_two_factor_channel_text = true
   require_two_factor = true
