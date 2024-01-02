@@ -25,9 +25,9 @@ func (e2fa *Enforcements2faDataSourceModel) ToKeeper(enforcements map[string]str
 	getBoolValue(e2fa.RestrictTwoFactorChannelGoogle, "restrict_two_factor_channel_google", enforcements)
 	getBoolValue(e2fa.RestrictTwoFactorChannelText, "restrict_two_factor_channel_text", enforcements)
 	getBoolValue(e2fa.RequireTwoFactor, "require_two_factor", enforcements)
-	getStringValue(e2fa.TwoFactorDurationDesktop, "two_factor_duration_desktop", enforcements)
-	getStringValue(e2fa.TwoFactorDurationMobile, "two_factor_duration_mobile", enforcements)
-	getStringValue(e2fa.TwoFactorDurationWeb, "two_factor_duration_web", enforcements)
+	getDurationValue(e2fa.TwoFactorDurationDesktop, "two_factor_duration_desktop", enforcements)
+	getDurationValue(e2fa.TwoFactorDurationMobile, "two_factor_duration_mobile", enforcements)
+	getDurationValue(e2fa.TwoFactorDurationWeb, "two_factor_duration_web", enforcements)
 }
 
 func (e2fa *Enforcements2faDataSourceModel) FromKeeper(enforcements map[string]string) {
@@ -38,9 +38,9 @@ func (e2fa *Enforcements2faDataSourceModel) FromKeeper(enforcements map[string]s
 	setBoolValue(&e2fa.RestrictTwoFactorChannelGoogle, "restrict_two_factor_channel_google", enforcements)
 	setBoolValue(&e2fa.RestrictTwoFactorChannelText, "restrict_two_factor_channel_text", enforcements)
 	setBoolValue(&e2fa.RequireTwoFactor, "require_two_factor", enforcements)
-	setStringValue(&e2fa.TwoFactorDurationDesktop, "two_factor_duration_desktop", enforcements)
-	setStringValue(&e2fa.TwoFactorDurationMobile, "two_factor_duration_mobile", enforcements)
-	setStringValue(&e2fa.TwoFactorDurationWeb, "two_factor_duration_web", enforcements)
+	setDurationValue(&e2fa.TwoFactorDurationDesktop, "two_factor_duration_desktop", enforcements)
+	setDurationValue(&e2fa.TwoFactorDurationMobile, "two_factor_duration_mobile", enforcements)
+	setDurationValue(&e2fa.TwoFactorDurationWeb, "two_factor_duration_web", enforcements)
 }
 
 func (e2fa *Enforcements2faDataSourceModel) IsBlank() bool {

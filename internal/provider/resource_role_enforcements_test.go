@@ -33,7 +33,9 @@ data "keeper_enforcements_account" "limited" {
 	logout_timer_mobile = 5
 	logout_timer_web = 30
 }
-
+data "keeper_enforcements_record_types" "enforcements" {
+  restrict_record_types = ["bankAccount", "bankCard"]
+}
 resource "keeper_role" "sso_user" {
   node_id = data.keeper_node.root.node_id
   name = "SSO User"
@@ -47,6 +49,7 @@ resource "keeper_role_enforcements" "sso_user_enf" {
       restrict_import = true
       restrict_export = true
     }
+    record_types = data.keeper_enforcements_record_types.enforcements
   }
 }
 `

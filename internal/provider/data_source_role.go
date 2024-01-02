@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/keeper-security/keeper-sdk-golang/enterprise"
+	"github.com/keeper-security/keeper-sdk-golang/vault"
 	"strings"
 	"terraform-provider-keeper/internal/model"
 )
@@ -54,6 +55,7 @@ type roleDataSource struct {
 	roleEnforcements enterprise.IEnterpriseLink[enterprise.IRoleEnforcement, int64, string]
 	roleTeams        enterprise.IEnterpriseLink[enterprise.IRoleTeam, int64, string]
 	teams            enterprise.IEnterpriseEntity[enterprise.ITeam, string]
+	recordTypes      enterprise.IEnterpriseEntity[vault.IRecordType, string]
 }
 
 func newRoleDataSource() datasource.DataSource {
@@ -144,6 +146,7 @@ func (d *roleDataSource) Configure(ctx context.Context, req datasource.Configure
 		d.nodes = ed.Nodes()
 		d.roleTeams = ed.RoleTeams()
 		d.teams = ed.Teams()
+		d.recordTypes = ed.RecordTypes()
 	} else {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
@@ -244,7 +247,14 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return true
 	})
 	state.Enforcements = new(model.EnforcementsDataSourceModel)
-	state.Enforcements.FromKeeper(enforcements)
+	var rts []vault.IRecordType
+	if d.recordTypes != nil {
+		d.recordTypes.GetAllEntities(func(x vault.IRecordType) bool {
+			rts = append(rts, x)
+			return true
+		})
+	}
+	state.Enforcements.FromKeeper(enforcements, rts)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

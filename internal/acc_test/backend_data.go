@@ -1,8 +1,9 @@
-package test
+package acc_test
 
 import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/keeper-security/keeper-sdk-golang/enterprise"
+	"github.com/keeper-security/keeper-sdk-golang/vault"
 	"strconv"
 	"terraform-provider-keeper/internal/model"
 )
@@ -46,6 +47,7 @@ func NewTestingManagement() enterprise.IEnterpriseManagement {
 		bridges:          make(testEntity[enterprise.IBridge, int64]),
 		scims:            make(testEntity[enterprise.IScim, int64]),
 		managedCompanies: make(testEntity[enterprise.IManagedCompany, int64]),
+		recordTypes:      make(testEntity[vault.IRecordType, string]),
 	}
 	var rn = enterprise.NewNode(int64(lm.enterpriseId)<<32 + 2)
 	rn.SetName(lm.enterpriseInfo.EnterpriseName())
@@ -119,5 +121,71 @@ func NewTestingManagement() enterprise.IEnterpriseManagement {
 	us.SetFullName("Invited User")
 	lm.users[us.EnterpriseUserId()] = us
 
+	var renf = enterprise.NewRoleEnforcement(ra.RoleId(), "restrict_record_types")
+	renf.SetValue(`{"std":[11,14],"ent":[]}`)
+	lm.roleEnforcements.addLink(renf)
+
+	var err error
+	var irt vault.IRecordType
+	var rt = &storageRecordType{
+		id:      14,
+		scope:   vault.RecordTypeScope_Standard,
+		content: `{"$id":"address","categories":["address"],"description":"Address template","fields":[{"$ref":"address"},{"$ref":"fileRef"}]}`,
+	}
+	if irt, err = vault.ParseRecordType(rt); err == nil {
+		lm.recordTypes["address"] = irt
+	}
+	rt = &storageRecordType{
+		id:      1,
+		scope:   vault.RecordTypeScope_Standard,
+		content: `{"$id":"login","categories":["login"],"description":"Login template","fields":[{"$ref":"passkey"},{"$ref":"login"},{"$ref":"password"},{"$ref":"url"},{"$ref":"fileRef"},{"$ref":"oneTimeCode"}]}`,
+	}
+	if irt, err = vault.ParseRecordType(rt); err == nil {
+		lm.recordTypes["login"] = irt
+	}
+	rt = &storageRecordType{
+		id:      11,
+		scope:   vault.RecordTypeScope_Standard,
+		content: `{"$id":"bankAccount","description":"Bank account template","fields":[{"$ref":"bankAccount","required":true},{"$ref":"name"},{"$ref":"login"},{"$ref":"password"},{"$ref":"url"},{"$ref":"cardRef"},{"$ref":"fileRef"},{"$ref":"oneTimeCode"}]}`,
+	}
+	if irt, err = vault.ParseRecordType(rt); err == nil {
+		lm.recordTypes["bankAccount"] = irt
+	}
+
+	rt = &storageRecordType{
+		id:      18,
+		scope:   vault.RecordTypeScope_Standard,
+		content: `{"$id":"bankCard","categories":["payment"],"description":"Bank card template","fields":[{"$ref":"paymentCard"},{"$ref":"text","label":"cardholderName"},{"$ref":"pinCode"},{"$ref":"addressRef"},{"$ref":"fileRef"}]}`,
+	}
+	if irt, err = vault.ParseRecordType(rt); err == nil {
+		lm.recordTypes["bankCard"] = irt
+	}
+	rt = &storageRecordType{
+		id:      20,
+		scope:   vault.RecordTypeScope_Standard,
+		content: `{"$id":"contact","categories":["address"],"description":"Contact template","fields":[{"$ref":"name","required":true},{"$ref":"text","label":"company"},{"$ref":"email"},{"$ref":"phone"},{"$ref":"addressRef"},{"$ref":"fileRef"}]}`,
+	}
+	if irt, err = vault.ParseRecordType(rt); err == nil {
+		lm.recordTypes["contact"] = irt
+	}
 	return lm
+}
+
+type storageRecordType struct {
+	id      int64
+	scope   vault.RecordTypeScope
+	content string
+}
+
+func (srt *storageRecordType) Id() int64 {
+	return srt.id
+}
+func (srt *storageRecordType) Scope() int32 {
+	return int32(srt.scope)
+}
+func (srt *storageRecordType) Content() string {
+	return srt.content
+}
+func (srt *storageRecordType) Uid() int64 {
+	return srt.Id()
 }

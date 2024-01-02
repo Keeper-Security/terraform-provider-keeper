@@ -4,23 +4,34 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/keeper-security/keeper-sdk-golang/api"
+	"github.com/keeper-security/keeper-sdk-golang/vault"
+	"sort"
 	"strconv"
 	"strings"
 )
 
 var enforcementDescriptions map[string]string
+var tfaDurations map[string]int
 
 func init() {
+	tfaDurations = map[string]int{
+		"login":    0,
+		"12_hours": 12,
+		"24_hours": 24,
+		"30_days":  30,
+		"forever":  9999,
+	}
+
 	enforcementDescriptions = map[string]string{
-		"account":                   "Account-related enforcements",
-		"allow_ip_list":             "IP whitelist enforcements",
-		"sharing":                   "Sharing enforcements",
-		"keeper_fill":               "Keeper Fill enforcements",
-		"login":                     "Login-related enforcements",
-		"platform":                  "Keeper platform enforcements",
-		"record_types":              "Record-type enforcements",
-		"two_factor_authentication": "2FA enforcements",
-		"vault":                     "Vault-related enforcements",
+		"account":       "Account-related enforcements",
+		"allow_ip_list": "IP whitelist enforcements",
+		"sharing":       "Sharing enforcements",
+		"keeper_fill":   "Keeper Fill enforcements",
+		"login":         "Login-related enforcements",
+		"platform":      "Keeper platform enforcements",
+		"record_types":  "Record-type enforcements",
+		"two_factor":    "2FA enforcements",
+		"vault":         "Vault-related enforcements",
 
 		"master_password_minimum_length":                "Minimum length required for master password",
 		"master_password_minimum_special":               "Minimum # of special characters required for master password",
@@ -35,14 +46,14 @@ func init() {
 		"max_session_login_time":                        "Max session login time",
 		"restrict_persistent_login":                     "Restrict persistent login",
 		"stay_logged_in_default":                        "Enable staying logged-in by default",
-		"restrict_sharing_all":                          "Restrict all sharing",
+		"restrict_sharing_all_outgoing":                 "Restrict all outgoing sharing",
+		"restrict_sharing_all_incoming":                 "Restrict all incoming sharing",
 		"restrict_sharing_enterprise_outgoing":          "Restrict sharing to outside the enterprise",
 		"restrict_sharing_enterprise_incoming":          "Restrict sharing from outside the enterprise",
 		"restrict_export":                               "Restrict record exports",
 		"restrict_import":                               "Restrict record imports",
 		"restrict_file_upload":                          "Restrict file uploads",
 		"require_account_share":                         "Require account-share",
-		"restrict_sharing_incoming_all":                 "Restrict all incoming shares",
 		"restrict_sharing_record_with_attachments":      "Restrict sharing records with attachments",
 		"restrict_ip_addresses":                         "Restrict IP addresses",
 		"require_device_approval":                       "Require device approval",
@@ -143,11 +154,11 @@ type EnforcementsDataSourceModel struct {
 	Login                   *EnforcementsLoginDataSourceModel       `tfsdk:"login"`
 	Platform                *EnforcementsPlatformDataSourceModel    `tfsdk:"platform"`
 	RecordTypes             *EnforcementsRecordTypesDataSourceModel `tfsdk:"record_types"`
-	TwoFactorAuthentication *Enforcements2faDataSourceModel         `tfsdk:"two_factor_authentication"`
+	TwoFactorAuthentication *Enforcements2faDataSourceModel         `tfsdk:"two_factor"`
 	Vault                   *EnforcementsVaultDataSourceModel       `tfsdk:"vault"`
 }
 
-func (em *EnforcementsDataSourceModel) FromKeeper(enforcements map[string]string) {
+func (em *EnforcementsDataSourceModel) FromKeeper(enforcements map[string]string, keeperRecordTypes []vault.IRecordType) {
 	if enforcements == nil {
 		return
 	}
@@ -189,7 +200,7 @@ func (em *EnforcementsDataSourceModel) FromKeeper(enforcements map[string]string
 	}
 
 	var recordTypes = new(EnforcementsRecordTypesDataSourceModel)
-	recordTypes.FromKeeper(enforcements)
+	recordTypes.FromKeeper(enforcements, keeperRecordTypes)
 	if !recordTypes.IsBlank() {
 		em.RecordTypes = recordTypes
 	}
@@ -200,14 +211,14 @@ func (em *EnforcementsDataSourceModel) FromKeeper(enforcements map[string]string
 		em.TwoFactorAuthentication = twoFa
 	}
 
-	var vault = new(EnforcementsVaultDataSourceModel)
-	vault.FromKeeper(enforcements)
-	if !vault.IsBlank() {
-		em.Vault = vault
+	var vaultEnf = new(EnforcementsVaultDataSourceModel)
+	vaultEnf.FromKeeper(enforcements)
+	if !vaultEnf.IsBlank() {
+		em.Vault = vaultEnf
 	}
 }
 
-func (em *EnforcementsDataSourceModel) ToKeeper(enforcements map[string]string) {
+func (em *EnforcementsDataSourceModel) ToKeeper(enforcements map[string]string, keeperRecordTypes []vault.IRecordType) {
 	if em.Account != nil {
 		em.Account.ToKeeper(enforcements)
 	}
@@ -227,7 +238,7 @@ func (em *EnforcementsDataSourceModel) ToKeeper(enforcements map[string]string) 
 		em.Platform.ToKeeper(enforcements)
 	}
 	if em.RecordTypes != nil {
-		em.RecordTypes.ToKeeper(enforcements)
+		em.RecordTypes.ToKeeper(enforcements, keeperRecordTypes)
 	}
 	if em.TwoFactorAuthentication != nil {
 		em.TwoFactorAuthentication.ToKeeper(enforcements)
@@ -300,6 +311,32 @@ func getStringValue(property types.String, key string, enforcements map[string]s
 	}
 }
 
+func getDurationValue(property types.String, key string, enforcements map[string]string) {
+	if !property.IsNull() {
+		var strValue = property.ValueString()
+		if len(strValue) > 0 {
+			var mi int
+			var ok bool
+			if mi, ok = tfaDurations[strValue]; !ok {
+				mi = 0
+			}
+			var si []int
+			for _, v := range tfaDurations {
+				if v <= mi {
+					si = append(si, v)
+				}
+			}
+			sort.Slice(si, func(i, j int) bool {
+				return i < j
+			})
+			var vs = api.SliceSelect(si, func(x int) string {
+				return strconv.Itoa(x)
+			})
+			enforcements[key] = strings.Join(vs, ",")
+		}
+	}
+}
+
 func setInt64Value(property *types.Int64, key string, enforcements map[string]string) {
 	var ok bool
 	var strValue string
@@ -332,6 +369,41 @@ func setStringValue(property *types.String, key string, enforcements map[string]
 	var ok bool
 	var strValue string
 	if strValue, ok = enforcements[key]; ok {
+		*property = types.StringValue(strValue)
+	} else {
+		*property = types.StringNull()
+	}
+}
+
+func setDurationValue(property *types.String, key string, enforcements map[string]string) {
+	var ok bool
+	var strValue string
+	if strValue, ok = enforcements[key]; ok {
+		var vs = api.SliceSelect(strings.Split(strValue, ","), func(x string) string {
+			return strings.TrimSpace(x)
+		})
+		var vi = api.SliceSelect(vs, func(x string) int {
+			var i int
+			var err error
+			if i, err = strconv.Atoi(x); err == nil {
+				return i
+			}
+			return 0
+		})
+		var mi = api.SliceReduce(vi, 0, func(i int, i2 int) int {
+			if i > i2 {
+				return i
+			} else {
+				return i2
+			}
+		})
+		strValue = "login"
+		for k, v := range tfaDurations {
+			if v == mi {
+				strValue = k
+				break
+			}
+		}
 		*property = types.StringValue(strValue)
 	} else {
 		*property = types.StringNull()

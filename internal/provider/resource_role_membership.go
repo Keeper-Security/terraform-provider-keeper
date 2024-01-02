@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/keeper-security/keeper-sdk-golang/api"
 	"github.com/keeper-security/keeper-sdk-golang/enterprise"
+	"strconv"
 )
 
 func newRoleMembershipResource() resource.Resource {
@@ -71,7 +72,17 @@ func (rmr *roleMembershipResource) Configure(_ context.Context, req resource.Con
 }
 
 func (rmr *roleMembershipResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("role_id"), req, resp)
+	var roleId int
+	var err error
+
+	if roleId, err = strconv.Atoi(req.ID); err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid role ID value.",
+			fmt.Sprintf("Interger value expected. Got \"%s\"", req.ID),
+		)
+		return
+	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("role_id"), int64(roleId))...)
 }
 
 func (rmr *roleMembershipResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -109,10 +120,10 @@ func (rmr *roleMembershipResource) Read(ctx context.Context, req resource.ReadRe
 		return true
 	})
 	state.Teams, diags = types.SetValue(types.StringType, members)
-
 	if resp.Diagnostics.Append(diags...); resp.Diagnostics.HasError() {
 		return
 	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/keeper-security/keeper-sdk-golang/api"
 	"github.com/keeper-security/keeper-sdk-golang/enterprise"
+	"github.com/keeper-security/keeper-sdk-golang/vault"
 	"strconv"
 	"strings"
 	"terraform-provider-keeper/internal/model"
@@ -110,7 +111,14 @@ func (rmr *roleEnforcementsResource) Read(ctx context.Context, req resource.Read
 		return true
 	})
 	state.Enforcements = new(model.EnforcementsDataSourceModel)
-	state.Enforcements.FromKeeper(enforcements)
+	var rts []vault.IRecordType
+	if rmr.management.EnterpriseData().RecordTypes() != nil {
+		rmr.management.EnterpriseData().RecordTypes().GetAllEntities(func(x vault.IRecordType) bool {
+			rts = append(rts, x)
+			return true
+		})
+	}
+	state.Enforcements.FromKeeper(enforcements, rts)
 
 	if resp.Diagnostics.Append(diags...); resp.Diagnostics.HasError() {
 		return
@@ -139,7 +147,14 @@ func (rmr *roleEnforcementsResource) applyEnforcements(ctx context.Context, enf 
 
 	var newEnforcements = make(map[string]string)
 	if enf.Enforcements != nil {
-		enf.Enforcements.ToKeeper(newEnforcements)
+		var rts []vault.IRecordType
+		if rmr.management.EnterpriseData().RecordTypes() != nil {
+			rmr.management.EnterpriseData().RecordTypes().GetAllEntities(func(x vault.IRecordType) bool {
+				rts = append(rts, x)
+				return true
+			})
+		}
+		enf.Enforcements.ToKeeper(newEnforcements, rts)
 	}
 	tflog.Debug(ctx, fmt.Sprintf("# of new enforcements: %d", len(newEnforcements)))
 

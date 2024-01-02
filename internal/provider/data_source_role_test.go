@@ -22,5 +22,6 @@ func TestAccDataSourceRole_Read(t *testing.T) {
 const testConfigRoleDataSource = `
 data "keeper_role" "root" {
   role_id = 5299989643267
+  include_members = true
 }
 `

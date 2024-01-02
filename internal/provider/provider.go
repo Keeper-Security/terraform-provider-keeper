@@ -17,8 +17,8 @@ import (
 	"go.uber.org/zap/zapcore"
 	"os"
 	"strings"
+	"terraform-provider-keeper/internal/acc_test"
 	"terraform-provider-keeper/internal/model"
-	"terraform-provider-keeper/internal/test"
 )
 
 // Ensure KeeperEnterpriseProvider satisfies various provider interfaces.
@@ -30,13 +30,14 @@ type keeperEnterpriseProvider struct {
 	// provider is built and ran locally, and "test" when running acceptance
 	// testing.
 	version    string
-	management enterprise.IEnterpriseManagement
+	management *enterprise.IEnterpriseManagement
 }
 
-func New(version string) func() provider.Provider {
+func New(version string, management *enterprise.IEnterpriseManagement) func() provider.Provider {
 	return func() provider.Provider {
 		return &keeperEnterpriseProvider{
-			version: version,
+			version:    version,
+			management: management,
 		}
 	}
 }
@@ -44,6 +45,7 @@ func New(version string) func() provider.Provider {
 type keeperEnterpriseProviderModel struct {
 	ConfigurationPath types.String `tfsdk:"config_path"`
 	ConfigurationType types.String `tfsdk:"config_type"`
+	Password          types.String `tfsdk:"password"`
 }
 
 func (p *keeperEnterpriseProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -60,6 +62,10 @@ func (p *keeperEnterpriseProvider) Schema(ctx context.Context, req provider.Sche
 			},
 			"config_type": schema.StringAttribute{
 				MarkdownDescription: "Configuration file type: sdk | commander",
+				Optional:            true,
+			},
+			"password": schema.StringAttribute{
+				MarkdownDescription: "Keeper account password",
 				Optional:            true,
 			},
 		},
@@ -93,13 +99,14 @@ func (p *keeperEnterpriseProvider) Configure(ctx context.Context, req provider.C
 		return
 	}
 
-	if p.management == nil {
+	tflog.Warn(ctx, fmt.Sprintf("Called Provider configure: %t", *p.management == nil))
+	if *p.management == nil {
 		var core = model.NewTerraformCore(ctx, zapcore.DebugLevel)
 		var logger = zap.New(core)
 		api.SetLogger(logger)
 
 		if p.version == "test" {
-			p.management = test.NewTestingManagement()
+			*p.management = acc_test.NewTestingManagement()
 		} else {
 			if config.ConfigurationPath.IsUnknown() {
 				resp.Diagnostics.AddAttributeError(
@@ -149,7 +156,14 @@ func (p *keeperEnterpriseProvider) Configure(ctx context.Context, req provider.C
 			}
 			var keeperEndpoint = auth.NewKeeperEndpoint(keeperConfig.LastServer(), configStorage)
 			var loginAuth = auth.NewLoginAuth(keeperEndpoint)
-			loginAuth.Login(keeperConfig.LastLogin())
+			var passwords []string
+			if !config.Password.IsNull() {
+				var passwd = config.Password.ValueString()
+				if len(passwd) > 0 {
+					passwords = append(passwords, passwd)
+				}
+			}
+			loginAuth.Login(keeperConfig.LastLogin(), passwords...)
 			var step = loginAuth.Step()
 			if step.LoginState() != auth.LoginState_Connected {
 				var stepInfo string
@@ -203,11 +217,11 @@ func (p *keeperEnterpriseProvider) Configure(ctx context.Context, req provider.C
 				return
 			}
 
-			p.management = enterprise.NewSyncEnterpriseManagement(loader)
+			*p.management = enterprise.NewSyncEnterpriseManagement(loader)
 		}
 	}
-	resp.DataSourceData = p.management.EnterpriseData()
-	resp.ResourceData = p.management
+	resp.DataSourceData = (*p.management).EnterpriseData()
+	resp.ResourceData = *p.management
 }
 
 func (p *keeperEnterpriseProvider) Resources(ctx context.Context) []func() resource.Resource {
