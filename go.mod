@@ -9,7 +9,7 @@ require (
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 	github.com/hashicorp/terraform-plugin-testing v1.6.0
 	github.com/keeper-security/keeper-sdk-golang v0.9.1
-	go.uber.org/zap v1.26.0
+	go.uber.org/zap v1.27.0
 	gotest.tools v2.2.0+incompatible
 )
 
