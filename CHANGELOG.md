@@ -1,3 +1,4 @@
-## 0.1.0 (Unreleased)
+## 1.2.0 (Initial release)
 
-FEATURES:
+- Data sources: users, teams, nodes, roles, privileges and enforcements
+- Resources: node, managed node, roles enforcements and membership, teams and membership
